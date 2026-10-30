@@ -1,0 +1,16 @@
+{
+  "name": "ahoy-marketing-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A-hoy hybrid SWAS — Ship (Captain) + Crew Deck",
+  "workspaces": [
+    "apps/web",
+    "apps/mobile"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload --port 8000",
+    "test:api": "cd apps/api && uv run pytest",
+    "lint:web": "npm run lint --workspace=apps/web"
+  }
+}

@@ -1,0 +1,17 @@
+# Optional local Postgres with pgvector (requires Docker).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ahoy
+    volumes:
+      - ahoy_pg:/var/lib/postgresql/data
+      - ./packages/db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+      - ./packages/db/migrations/002_seed_oak_lawn.sql:/docker-entrypoint-initdb.d/002_seed_oak_lawn.sql:ro
+
+volumes:
+  ahoy_pg:
