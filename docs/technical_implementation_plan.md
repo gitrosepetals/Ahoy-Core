@@ -2,7 +2,7 @@
 
 **Document Version:** 1.4  
 **Status:** Initial plan (push-primary nudges; magic link for auth only)  
-**Build progress:** Milestone A implemented — see [milestone_a.md](./milestone_a.md) (living build log).  
+**Build progress:** Milestones A–C done (local) — see [milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md). Every slice (including polish beyond milestones): [iterations.md](./iterations.md).  
 **Source inputs:** [`business docs/a_hoy_product_requirements_document_prd.md`](../business%20docs/a_hoy_product_requirements_document_prd.md), [`business docs/a_hoy_strategy_hybrid_playbook.md`](../business%20docs/a_hoy_strategy_hybrid_playbook.md), [`a_hoy_postgresql_database_schema.sql`](../a_hoy_postgresql_database_schema.sql)
 
 ---
