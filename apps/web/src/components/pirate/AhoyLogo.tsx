@@ -11,8 +11,17 @@ type AhoyLogoProps = {
   title?: string;
 };
 
-/** A-hoy mark: sail as letter A + hull — theme-aware via currentColor + pennant accent. */
-export function AhoyMark({ className = "ahoy-logo-mark", title }: { className?: string; title?: string }) {
+/**
+ * A-hoy mark: sail / tent chevron + mast pennant + hull crescent.
+ * Transparent SVG — theme-aware via currentColor (no background fill).
+ */
+export function AhoyMark({
+  className = "ahoy-logo-mark",
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
   return (
     <svg
       className={className}
@@ -23,29 +32,38 @@ export function AhoyMark({ className = "ahoy-logo-mark", title }: { className?: 
       aria-hidden={title ? undefined : true}
     >
       {title ? <title>{title}</title> : null}
-      {/* Mast */}
-      <path d="M32 8v36" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      {/* Mainsail as A */}
+      {/* Mast stub */}
       <path
-        d="M32 10 48 42H36.5L32 32 27.5 42H16L32 10Z"
-        fill="currentColor"
-        fillOpacity="0.12"
+        d="M32 6v10"
         stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
+        strokeWidth="5"
+        strokeLinecap="round"
       />
-      {/* A crossbar */}
-      <path d="M24 30h16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Hull */}
+      {/* Swallowtail pennant */}
+      <path d="M34 7.5h16l-4.5 4.5 4.5 4.5H34V7.5Z" fill="currentColor" />
+      {/* Outer sail (open base) */}
       <path
-        d="M12 50c4 6 36 6 40 0H12Z"
-        fill="currentColor"
+        d="M32 14 50 46H14L32 14Z"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="5"
         strokeLinejoin="round"
+        strokeLinecap="round"
       />
-      {/* Pennant */}
-      <path d="M32 8h14l-4 4 4 4H32V8Z" fill="var(--ahoy-lantern)" />
+      {/* Inner chevron / tent opening */}
+      <path
+        d="M23 46 32 28 41 46"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {/* Hull crescent */}
+      <path
+        d="M12 54c6 5.5 34 5.5 40 0"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -59,7 +77,10 @@ export function AhoyLogo({
 }: AhoyLogoProps) {
   const inner = (
     <span className={`ahoy-logo ${className}`.trim()}>
-      <AhoyMark className={`ahoy-logo-mark ${markClassName}`.trim()} title={withWordmark ? undefined : title} />
+      <AhoyMark
+        className={`ahoy-logo-mark ${markClassName}`.trim()}
+        title={withWordmark ? undefined : title}
+      />
       {withWordmark ? <span className="ahoy-logo-word">A-hoy</span> : null}
     </span>
   );

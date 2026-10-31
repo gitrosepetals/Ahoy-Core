@@ -23,6 +23,11 @@ export default function HomePage() {
           Sign in
         </Link>
       </div>
+      <p className="ahoy-rise-delay">
+        <Link href="/welcome" className="ahoy-link">
+          New here? See A-hoy
+        </Link>
+      </p>
     </main>
   );
 }

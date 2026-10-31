@@ -8,6 +8,7 @@ SQL migrations and seeds for A-hoy (Postgres + `pgvector`).
 |---|---|
 | `migrations/001_initial_schema.sql` | Core schema with `captain`/`crew`/`deckhand`/`admin`, plus auth, push tokens, reviews, leads, credentials |
 | `migrations/002_seed_oak_lawn.sql` | Demo tenant Oak Lawn Optometry |
+| `migrations/005_marketing_leads.sql` | Welcome-page email capture (`marketing_leads`) |
 
 Apply (libpq URL, not the SQLAlchemy async URL):
 

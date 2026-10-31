@@ -169,3 +169,14 @@ class ReviewOut(BaseModel):
     reviewed_at: datetime | None = None
     created_at: datetime | None = None
     needs_captain: bool = False
+
+
+class MarketingLeadRequest(BaseModel):
+    email: EmailStr
+    business_name: str | None = Field(default=None, max_length=200)
+    source: str = Field(default="welcome", max_length=80)
+
+
+class MarketingLeadResponse(BaseModel):
+    ok: bool = True
+    email: str

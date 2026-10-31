@@ -344,3 +344,21 @@ export async function approveReviewReply(accessToken: string, reviewId: string) 
   if (!res.ok) throw new Error(await parseError(res));
   return res.json() as Promise<ReviewItem>;
 }
+
+export async function submitMarketingLead(input: {
+  email: string;
+  business_name?: string;
+  source?: string;
+}) {
+  const res = await fetch(`${API_BASE}/marketing/leads`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      email: input.email,
+      business_name: input.business_name || null,
+      source: input.source || "welcome",
+    }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json() as Promise<{ ok: boolean; email: string }>;
+}

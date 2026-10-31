@@ -2,7 +2,7 @@
 
 Living build log for **every product/engineering slice**, including work that is not a milestone checklist item (polish, merges, test hardening, CI). Newest first.
 
-**Current version:** `0.6.90`
+**Current version:** `0.6.92`
 
 Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing polish or API surface; reserve **major** for milestone-aligned releases (A/B/C/D). Milestone gates still have their own logs ([milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md)). Outages stay in [incident_log.md](./incident_log.md).
 
@@ -26,6 +26,31 @@ Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing pol
 
 **Related:** optional links
 ```
+
+---
+
+## 0.6.92 — Transparent SVG mark; nav-only on welcome
+
+**Why:** PNG mark had a paper background; large page logo competed with the hero wordmark.
+
+**What shipped:**
+- `AhoyMark` redrawn as transparent SVG (sail chevron + pennant + hull)
+- `/welcome` shows the mark only in the top nav; hero is wordmark + copy
+
+**How to try:** Open `/welcome` — logo in header only; no boxed background.
+
+---
+
+## 0.6.91 — Welcome landing + email capture
+
+**Why:** Platform gate alone doesn’t explain A-hoy services to prospects.
+
+**What shipped:**
+- Public `/welcome` with boat mark hero, Bridge/Engine Room, niches, Harbor/Cruiser/Flagship
+- Email acquisition form → `POST /api/v1/marketing/leads` + `marketing_leads` migration
+- `/` keeps Ship/Crew gate; “New here? See A-hoy” → `/welcome`
+
+**How to try:** Open `/welcome`, submit an email; confirm row in `marketing_leads`. Apply `005_marketing_leads.sql` if needed.
 
 ---
 

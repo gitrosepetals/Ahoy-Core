@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import auth, brand, campaigns, clients, devices, media, queue, reviews, roi
+from app.routers import auth, brand, campaigns, clients, devices, marketing, media, queue, reviews, roi
 
 settings = get_settings()
 
@@ -30,6 +30,7 @@ app.include_router(campaigns.router, prefix=api)
 app.include_router(queue.router, prefix=api)
 app.include_router(roi.router, prefix=api)
 app.include_router(reviews.router, prefix=api)
+app.include_router(marketing.router, prefix=api)
 
 upload_root = Path(settings.upload_dir)
 if not upload_root.is_absolute():

@@ -828,6 +828,10 @@ body {
   color: var(--ahoy-fg);
 }
 
+.ahoy-welcome-form .ahoy-input {
+  width: 100%;
+}
+
 .ahoy-logo-mark {
   width: 2.75rem;
   height: 2.75rem;
