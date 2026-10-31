@@ -72,33 +72,63 @@ function WaveTrack({
 
 type Pt = { x: number; y: number };
 
-const SWING = 780;
+/** Stable for the page session so scroll remounts don’t reshuffle the path. */
+const TRAIL_SESSION = Math.floor(Math.random() * 1e9);
 
-/** Serpentine from first container → last, in root-local px. */
-function buildSlither(start: Pt, end: Pt, pageW: number): string {
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function trailSeed(start: Pt, end: Pt, pageW: number) {
+  const h =
+    TRAIL_SESSION ^
+    (Math.round(start.y / 8) * 73856093) ^
+    (Math.round(end.y / 8) * 19349663) ^
+    (Math.round(pageW / 16) * 83492791);
+  return h >>> 0;
+}
+
+function trailAmp(pageW: number) {
   const mid = pageW / 2;
-  // Wide into the gutters so the path isn't lost under the center column
-  const amp = Math.min(pageW * 0.46, 520);
+  // Keep swings inside the viewport with a clear gutter margin
+  return Math.max(48, Math.min(pageW * 0.28, mid - 36));
+}
+
+/** Serpentine L↔R down the page — swing size & reach vary; soft easing; always down. */
+function buildSlither(start: Pt, end: Pt, pageW: number): string {
+  const rand = mulberry32(trailSeed(start, end, pageW));
+  const mid = pageW / 2;
+  const maxAmp = trailAmp(pageW);
   const y0 = start.y;
-  const y1 = Math.max(end.y, y0 + SWING);
+  const y1 = Math.max(end.y, y0 + 520);
   let d = `M${start.x} ${y0}`;
   let x = start.x;
   let y = y0;
-  let toRight = start.x <= mid;
+  let toRight = start.x < mid;
   let guard = 0;
-  while (y < y1 - 8 && guard < 200) {
+  while (y < y1 - 8 && guard < 120) {
     guard += 1;
-    const nextY = Math.min(y1, y + SWING);
+    const swing = 520 + rand() * 420;
+    const amp = maxAmp * (0.72 + rand() * 0.28);
+    const nextY = Math.min(y1, y + swing);
     const nextX = toRight ? mid + amp : mid - amp;
-    const dy = nextY - y;
-    // Ease handles stay near each endpoint — long, soft arcs instead of sharp S-bends
-    d += ` C${x} ${y + dy * 0.48} ${nextX} ${y + dy * 0.52} ${nextX} ${nextY}`;
+    const dy = Math.max(1, nextY - y);
+    const t1 = 0.48 + rand() * 0.04;
+    const t2 = 0.5 + rand() * 0.04;
+    d += ` C${x} ${y + dy * t1} ${nextX} ${y + dy * t2} ${nextX} ${nextY}`;
     toRight = !toRight;
     x = nextX;
     y = nextY;
   }
   const dyEnd = Math.max(1, end.y - y);
-  d += ` C${x} ${y + dyEnd * 0.45} ${end.x} ${end.y - dyEnd * 0.2} ${end.x} ${end.y}`;
+  d += ` C${x} ${y + dyEnd * 0.5} ${end.x} ${end.y - dyEnd * 0.15} ${end.x} ${end.y}`;
   return d;
 }
 
@@ -114,18 +144,22 @@ function findAnchors(root: HTMLElement): { start: Pt; end: Pt } | null {
   if (list.length === 0) return null;
 
   const rr = root.getBoundingClientRect();
+  const pageW = root.offsetWidth || window.innerWidth;
+  const mid = pageW / 2;
+  const amp = trailAmp(pageW);
   const first = list[0];
   const fr = first.getBoundingClientRect();
+  // Start under the header block, in-frame left gutter — never through title/subtitle
   const start: Pt = {
-    x: fr.left - rr.left + fr.width / 2,
-    y: fr.top - rr.top + Math.min(28, fr.height * 0.35),
+    x: mid - amp,
+    y: fr.bottom - rr.top + 16,
   };
 
-  // X sits below the main column — not on a post/card
+  // End below the main column — not on a post/card
   const main = root.querySelector("main");
   const mr = (main ?? list[list.length - 1]).getBoundingClientRect();
   const end: Pt = {
-    x: mr.left - rr.left + mr.width / 2,
+    x: mid + amp * 0.55,
     y: Math.min(root.offsetHeight - 20, mr.bottom - rr.top + 36),
   };
 
@@ -146,123 +180,116 @@ export function AhoyScrollProgress({
   const maskId = useId().replace(/:/g, "");
   const [pageP, setPageP] = useState(0);
   const [enabled, setEnabled] = useState(true);
-  const [pathLen, setPathLen] = useState(0);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [trail, setTrail] = useState("");
-  const [drawn, setDrawn] = useState(0);
-  const [anchors, setAnchors] = useState<{ start: Pt; end: Pt } | null>(null);
-  const pathRef = useRef<SVGPathElement | null>(null);
-
-  const placeDrawn = (page: number, top: number, clientH: number, span: { start: Pt; end: Pt }) => {
-    const el = pathRef.current;
-    if (!el) return;
-    const len = el.getTotalLength();
-    if (len <= 0) return;
-    setPathLen(len);
-
-    const y0 = span.start.y;
-    const y1 = Math.max(span.end.y, y0 + 1);
-    const focusY = top + clientH * 0.5;
-
-    let along = 0;
-    if (page >= 0.9 || focusY >= y1 - 12) {
-      along = len;
-    } else {
-      let lo = 0;
-      let hi = len;
-      for (let i = 0; i < 20; i++) {
-        const mid = (lo + hi) / 2;
-        if (el.getPointAtLength(mid).y < focusY) lo = mid;
-        else hi = mid;
-      }
-      along = hi;
-      if (page >= 0.75) {
-        const blend = (page - 0.75) / 0.15;
-        along = along + (len - along) * Math.min(1, Math.max(0, blend));
-      }
-    }
-
-    setDrawn(along);
-  };
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const layoutKeyRef = useRef("");
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) setEnabled(false);
 
-    let raf = 0;
-    const update = () => {
-      raf = 0;
+    let scrollRaf = 0;
+    let layoutRaf = 0;
+    let layoutTimer = 0;
+
+    const syncSvgBox = (w: number, h: number) => {
+      sizeRef.current = { w, h };
+      const svg = svgRef.current;
+      if (svg) {
+        svg.setAttribute("width", String(w));
+        svg.setAttribute("height", String(h));
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      }
+    };
+
+    const readPage = () => {
+      const doc = document.documentElement;
+      if (doc.scrollHeight <= doc.clientHeight) return 1;
+      const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
+      return Math.min(1, Math.max(0, (window.scrollY || doc.scrollTop) / max));
+    };
+
+    const onScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        const root =
+          document.querySelector<HTMLElement>(".ahoy-trail-root") ?? document.documentElement;
+        const w = root.offsetWidth || window.innerWidth;
+        const h = Math.max(root.offsetHeight, document.documentElement.scrollHeight);
+        // Grow the SVG with the page without rebuilding the path (avoids vanish mid-scroll)
+        if (h > sizeRef.current.h + 2 || Math.abs(w - sizeRef.current.w) > 2) {
+          syncSvgBox(w, Math.max(h, sizeRef.current.h));
+          setSize({ w, h: Math.max(h, sizeRef.current.h) });
+        }
+        setPageP(readPage());
+      });
+    };
+
+    const rebuildPath = () => {
+      layoutRaf = 0;
       const root =
         document.querySelector<HTMLElement>(".ahoy-trail-root") ?? document.documentElement;
       const w = root.offsetWidth || window.innerWidth;
       const h = Math.max(root.offsetHeight, document.documentElement.scrollHeight);
+      syncSvgBox(w, h);
       setSize({ w, h });
 
-      if (showTrail) {
-        const next = findAnchors(root);
-        if (next) {
-          setAnchors(next);
-          setTrail(buildSlither(next.start, next.end, w));
-        }
-      } else {
+      if (!showTrail) {
+        layoutKeyRef.current = "";
         setTrail("");
-        setAnchors(null);
-        setPathLen(0);
-        setDrawn(0);
+        setPageP(readPage());
+        return;
       }
 
-      const doc = document.documentElement;
-      const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
-      const top = window.scrollY || doc.scrollTop;
-      const page = Math.min(1, Math.max(0, top / max));
-      setPageP(page);
-    };
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(update);
+      const next = findAnchors(root);
+      if (!next) {
+        setTrail("");
+        setPageP(readPage());
+        return;
+      }
+
+      // Coarse key — ignore small height jitter; extend path when page grows a lot
+      const key = `${Math.round(w / 8)}:${Math.round(next.start.y / 16)}:${Math.round(next.end.y / 200)}`;
+      if (key !== layoutKeyRef.current) {
+        layoutKeyRef.current = key;
+        setTrail(buildSlither(next.start, next.end, w));
+      }
+      setPageP(readPage());
     };
 
-    requestAnimationFrame(update);
+    const onLayout = () => {
+      // Debounce: mobile chrome / content reveals fire many resizes while scrolling
+      if (layoutTimer) window.clearTimeout(layoutTimer);
+      layoutTimer = window.setTimeout(() => {
+        layoutTimer = 0;
+        if (layoutRaf) return;
+        layoutRaf = requestAnimationFrame(rebuildPath);
+      }, 120);
+    };
+
+    requestAnimationFrame(rebuildPath);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    const ro = new ResizeObserver(onScroll);
+    window.addEventListener("resize", onLayout, { passive: true });
+    // Observe the ship root only — documentElement resize fires on scroll in many browsers
+    const ro = new ResizeObserver(onLayout);
     const root = document.querySelector(".ahoy-trail-root");
     if (root) ro.observe(root);
-    ro.observe(document.documentElement);
 
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onLayout);
       ro.disconnect();
-      if (raf) cancelAnimationFrame(raf);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      if (layoutRaf) cancelAnimationFrame(layoutRaf);
+      if (layoutTimer) window.clearTimeout(layoutTimer);
     };
   }, [showTrail]);
 
-  // Remeasure draw length after the path is in the DOM with the latest `d`
-  useEffect(() => {
-    if (!showTrail || !trail || !anchors || size.h <= 0) return;
-    const top = window.scrollY || document.documentElement.scrollTop;
-    const page =
-      document.documentElement.scrollHeight <= document.documentElement.clientHeight
-        ? 1
-        : Math.min(
-            1,
-            top /
-              Math.max(
-                1,
-                document.documentElement.scrollHeight - document.documentElement.clientHeight,
-              ),
-          );
-    // Double rAF: wait for SVG layout after trail string commit
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        placeDrawn(page, top, document.documentElement.clientHeight, anchors);
-      });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [showTrail, trail, anchors, size.h, pageP]);
-
-  const len = pathLen || 1;
+  // pathLength=1 → reveal is just page progress (no getTotalLength flicker)
+  const drawn = Math.max(0.001, pageP);
 
   return (
     <>
@@ -276,6 +303,7 @@ export function AhoyScrollProgress({
 
       {showTrail && size.w > 0 && size.h > 0 && trail ? (
         <svg
+          ref={svgRef}
           className="ahoy-dotted-line ahoy-dotted-line-page"
           width={size.w}
           height={size.h}
@@ -294,19 +322,18 @@ export function AhoyScrollProgress({
               <rect width={size.w} height={size.h} fill="black" />
               <path
                 d={trail}
+                pathLength={1}
                 fill="none"
                 stroke="white"
                 strokeWidth="24"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeDasharray={pathLen > 0 ? `${Math.max(0.001, drawn)} ${len}` : "0 1"}
+                strokeDasharray={`${drawn} 1`}
               />
             </mask>
           </defs>
 
-          <path ref={pathRef} d={trail} fill="none" stroke="transparent" strokeWidth="1" />
-
-          {enabled && pathLen > 0 ? (
+          {enabled ? (
             <path
               d={trail}
               fill="none"

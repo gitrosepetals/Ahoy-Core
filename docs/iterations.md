@@ -2,7 +2,7 @@
 
 Living build log for **every product/engineering slice**, including work that is not a milestone checklist item (polish, merges, test hardening, CI). Newest first.
 
-**Current version:** `0.6.80`
+**Current version:** `0.6.90`
 
 Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing polish or API surface; reserve **major** for milestone-aligned releases (A/B/C/D). Milestone gates still have their own logs ([milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md)). Outages stay in [incident_log.md](./incident_log.md).
 
@@ -26,6 +26,124 @@ Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing pol
 
 **Related:** optional links
 ```
+
+---
+
+## 0.6.90 — Trail no longer vanishes on long scroll
+
+**Why:** ResizeObserver + pathLength remounts wiped the trail when scrolling far/fast.
+
+**What shipped:**
+- Reveal via `pathLength={1}` (no length flicker)
+- SVG grows with page height without rebuilding the path
+- Debounced layout; stop observing `documentElement` resize-on-scroll
+
+**How to try:** Hard-refresh Manifest and scroll hard to the bottom — trail should stay drawn.
+
+---
+
+## 0.6.89 — No waves on Manifest
+
+**Why:** Manifest should be trail-only; waves competed with the slither.
+
+**What shipped:**
+- ShipAtmosphere turns off deck waves on Manifest / queue
+
+**How to try:** Open Manifest — grey trail only, no bottom waves.
+
+---
+
+## 0.6.88 — Trail stays on fast scroll; prior opacity
+
+**Why:** Fast scroll re-rendered the mask at ~0 length so the trail vanished; opacity felt too strong.
+
+**What shipped:**
+- Reveal length tied to scroll progress in React (no reset to empty)
+- Restored previous dotted stroke opacity / dash pattern
+
+**How to try:** Hard-refresh Manifest and fling-scroll — trail should keep its drawn length.
+
+---
+
+## 0.6.87 — Trail in-frame and more visible
+
+**Why:** Slither swung off-screen and was too faint to notice.
+
+**What shipped:**
+- Amp clamped inside the viewport with edge margin
+- Stronger stroke, denser dashes, higher opacity (light + dark)
+
+**How to try:** Hard-refresh Manifest — grey trail should stay on-screen and read clearly in the gutters.
+
+---
+
+## 0.6.86 — Smoother, faster Manifest trail
+
+**Why:** Trail rebuilt + binary-searched on every scroll, so draw felt laggy.
+
+**What shipped:**
+- Path rebuilds only on layout change; scroll only updates reveal (DOM dasharray)
+- Linear scroll→length mapping; softer longer curves, fewer segments
+
+**How to try:** Hard-refresh Manifest and scroll — trail should draw smoothly without hitching.
+
+---
+
+## 0.6.85 — Randomized Manifest trail
+
+**Why:** Path felt identical every visit.
+
+**What shipped:**
+- Each session gets a unique L↔R downward slither — random swing length, width, and curve ease
+- Seeded so scrolling doesn’t reshuffle mid-page
+
+**How to try:** Hard-refresh Manifest a few times — trail shape/size should change, still left↔right and down.
+
+---
+
+## 0.6.84 — Trail clears Manifest header text
+
+**Why:** Slither started through the Manifest title/subtitle.
+
+**What shipped:**
+- Trail starts below the header block, out in the left gutter
+
+**How to try:** Hard-refresh Manifest — grey trail should miss the copy under the title.
+
+---
+
+## 0.6.83 — Shared Manifest column width
+
+**Why:** Feed vs List used different max-widths, so the toggle jumped.
+
+**What shipped:**
+- Both layouts share one `max-w-lg` column and the same chrome padding
+
+**How to try:** Manifest → toggle Feed / List — toolbar stays put.
+
+---
+
+## 0.6.82 — Manifest Feed / List toggle
+
+**Why:** Keep both the social feed and the earlier compact list.
+
+**What shipped:**
+- Feed vs List chooser on Manifest (persists in localStorage)
+- Same approve / edit / swap actions in both layouts
+
+**How to try:** Manifest → switch Feed / List in the toolbar.
+
+---
+
+## 0.6.81 — Manifest as social feed
+
+**Why:** Queue cards read like an admin list, not a captain’s content feed.
+
+**What shipped:**
+- Feed posts: avatar + business name, square media, caption under image, status badge
+- Narrow feed column; relative timestamps; actions under each post when awaiting
+
+**How to try:** Open Manifest — scroll a social-style feed of posts to approve.
 
 ---
 

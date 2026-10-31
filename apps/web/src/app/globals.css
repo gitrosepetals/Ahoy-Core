@@ -428,6 +428,109 @@ body {
   box-shadow: inset 3px 0 0 var(--ahoy-copper);
 }
 
+/* Manifest social feed */
+.ahoy-feed-post {
+  border-block: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-panel);
+}
+
+@media (min-width: 640px) {
+  .ahoy-feed-post {
+    border: 1px solid var(--ahoy-panel-border);
+    border-radius: 0.25rem;
+  }
+}
+
+.ahoy-feed-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.ahoy-feed-avatar {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid var(--ahoy-lantern);
+  background: var(--ahoy-bg);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-feed-name {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 700;
+  color: var(--ahoy-fg);
+  line-height: 1.3;
+}
+
+.ahoy-feed-meta .ahoy-muted {
+  margin: 0.1rem 0 0;
+  font-size: var(--ahoy-size-meta);
+}
+
+.ahoy-feed-badge {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-kicker);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ahoy-lantern);
+}
+
+.ahoy-feed-media {
+  position: relative;
+  width: 100%;
+  background: var(--ahoy-bg);
+}
+
+.ahoy-feed-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--ahoy-bg);
+}
+
+.ahoy-feed-img-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ahoy-feed-body {
+  padding: 0.85rem 1rem 0.5rem;
+}
+
+.ahoy-feed-caption {
+  margin: 0;
+  font-size: var(--ahoy-size-body);
+  line-height: 1.55;
+}
+
+.ahoy-feed-actions {
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid var(--ahoy-panel-border);
+}
+
+.ahoy-feed-swap {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-bg);
+}
+
 .ahoy-btn {
   display: inline-flex;
   align-items: center;
