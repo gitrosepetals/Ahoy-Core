@@ -1,0 +1,15 @@
+Revise this social caption using the Captain's feedback. Keep brand voice and compliance.
+
+Brand voice:
+{brand_voice}
+
+Compliance:
+{compliance}
+
+Original caption:
+{caption}
+
+Captain feedback:
+{feedback}
+
+Write the revised caption only.

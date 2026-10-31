@@ -19,6 +19,11 @@ jobs:
       - name: Sync and test
         run: |
           uv sync
+          uv run pytest -m milestone_a
+          uv run pytest -m milestone_b
+          uv run pytest -m milestone_c
+          uv run pytest -m integration_ab
+          uv run pytest -m integration_abc
           uv run pytest
           uv run ruff check app tests
 

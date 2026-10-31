@@ -236,17 +236,21 @@ Indexes already cover the hot paths (`content_queue` by client+status; ROI by da
 
 Details and runbook: [milestone_a.md](./milestone_a.md).
 
-### Milestone B — Crew Deck core (`AG-01`, `AG-03`) (week 2–3)
+### Milestone B — Crew Deck core (`AG-01`, `AG-03`) (week 2–3) — **DONE** (local)
 1. Brand Brain CRUD: voice, services JSON, zips, compliance; embed into `context_embedding` on save.
 2. Semi-automated campaign generator: Crew uploads/selects assets → API calls LLM with Brand Brain → writes `content_queue` as `draft_internal` → Crew reviews → `pending_client` → **push** to Captain (SMS fallback if no token).
 3. Revision loop: Captain `changes_requested` + feedback → LLM rewrite or Crew flag (Epic 1.2).
 
-### Milestone C — The Ship (`CL-01`, `CL-02`, `CL-05`) (week 3–5)
+Details: [milestone_b.md](./milestone_b.md).
+
+### Milestone C — The Ship (`CL-01`, `CL-02`, `CL-05`) (week 3–5) — **DONE** (local)
 1. **Treasure Map:** aggregate `daily_roi_metrics`; estimated revenue formula from PRD when POS absent; detail drawer for calls/forms.
 2. **Approval queue:** card/grid UI matching wireframe; Approve / Request Edit / Swap Media; optimistic UI (<200ms feel); Approve All; open from push deep link.
 3. **Reputation Radar:** ingest reviews (start with Google Business Profile); auto-reply 4–5★ with optional delay; **push** + one-click approve for 1–3★ (SMS fallback if needed).
 4. Bottom nav: Home, Calendar (stub), Media Vault (read-only list), Reviews.
-5. Ship TestFlight / internal Play track builds for pilot Captains (store listing can stay private/unlisted).
+5. Ship TestFlight / internal Play track builds for pilot Captains (store listing can stay private/unlisted) — Capacitor sync notes in milestone_c; store submit deferred.
+
+Details: [milestone_c.md](./milestone_c.md).
 
 ### Milestone D — Pilot hardening (week 5–8)
 1. Stripe subscription ↔ `subscription_tier`.

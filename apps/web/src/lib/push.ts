@@ -7,7 +7,7 @@
 export const SHIP_DEEP_LINK_PATHS = {
   verify: "/auth/verify",
   home: "/ship",
-  queue: "/ship/queue",
+  queue: "/ship/posts?tab=pending",
   review: (id: string) => `/ship/reviews/${id}`,
 } as const;
 

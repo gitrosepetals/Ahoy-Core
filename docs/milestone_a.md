@@ -100,12 +100,23 @@ cd apps/web && npm install && npm run dev
 Open http://localhost:3000/auth/sign-in → phone `+15551234001` → use returned **Dev link**.
 
 ```bash
-# Tests / lint (Docker A-hoy DB must be up for auth integration tests)
+# Tests / lint (A-hoy Postgres must be up for DB-backed tests)
 cd apps/api && uv run pytest && uv run ruff check app tests
 cd apps/web && npm run lint
 ```
 
-Auth regression (Captain + Crew magic-link): `apps/api/tests/test_auth_captain_crew.py` — see [incident_log.md](./incident_log.md).
+### Pytest markers (A / B / A↔B)
+
+| Command | What it proves |
+|---|---|
+| `uv run pytest -m milestone_a` | Auth, tenancy 403, push token, health/hash — no Brand Brain |
+| `uv run pytest -m milestone_b` | Brand Brain, media, generate/release/approve (sign-in only as setup) |
+| `uv run pytest -m milestone_c` | ROI, swap, approve-all, reviews |
+| `uv run pytest -m integration_ab` | A sessions + role/tenant gates across the B Crew→Captain pipeline |
+| `uv run pytest -m integration_abc` | A auth + B pipeline + C ROI/swap/approve-all/reviews |
+| `uv run pytest` | All of the above (CI) |
+
+Isolated A suite: `apps/api/tests/test_milestone_a.py` (see [incident_log.md](./incident_log.md) for the auth incident that motivated these regressions).
 
 ---
 
@@ -130,6 +141,7 @@ Auth regression (Captain + Crew magic-link): `apps/api/tests/test_auth_captain_c
 - Ship / Crew Deck / auth UI stubs; deep-link path helpers; CI workflow; env examples; root README.
 - Documented progress in this file (living build log per request).
 - **Incident:** sign-in Failed to fetch caused by Windows `postgresql-x64-18` + Docker both on 5432; fixed by stopping local service. Logged in [incident_log.md](./incident_log.md).
+- Pytest markers: isolated `milestone_a` suite in `test_milestone_a.py`; see also `milestone_b` / `integration_ab`.
 
 ---
 

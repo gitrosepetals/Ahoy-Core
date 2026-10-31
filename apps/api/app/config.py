@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
+    llm_dev_mode: bool = True
+    openai_api_key: str = ""
+    openai_chat_model: str = "gpt-4o-mini"
+    openai_embedding_model: str = "text-embedding-3-small"
+    upload_dir: str = "uploads"
+    public_api_base_url: str = "http://localhost:8000"
+
     cors_origins: str = "http://localhost:3000,capacitor://localhost,http://localhost"
 
 

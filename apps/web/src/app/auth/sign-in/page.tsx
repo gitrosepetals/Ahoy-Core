@@ -4,8 +4,17 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { requestMagicLink } from "@/lib/api";
 
+const CREW_PHONE = "+15551234002";
+const CAPTAIN_PHONE = "+15551234001";
+
+function redirectForPhone(phone: string): string {
+  const normalized = phone.trim();
+  if (normalized === CREW_PHONE) return "/crew";
+  return "/ship";
+}
+
 export default function SignInPage() {
-  const [phone, setPhone] = useState("+15551234001");
+  const [phone, setPhone] = useState(CAPTAIN_PHONE);
   const [message, setMessage] = useState<string | null>(null);
   const [devLink, setDevLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -18,7 +27,7 @@ export default function SignInPage() {
     try {
       const res = await requestMagicLink({
         phone_number: phone,
-        redirect_path: "/ship",
+        redirect_path: redirectForPhone(phone),
       });
       setMessage(res.message);
       if (res.dev_magic_link) setDevLink(res.dev_magic_link);
@@ -35,9 +44,10 @@ export default function SignInPage() {
         <Link href="/" className="text-sm text-sky-800 hover:underline">
           ← Home
         </Link>
-        <h1 className="mt-3 text-2xl font-semibold">Sign in to the Ship</h1>
+        <h1 className="mt-3 text-2xl font-semibold">Sign in</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Magic link is for authentication only. Use the seeded Captain phone in dev.
+          Dev phones: Captain <code>{CAPTAIN_PHONE}</code> → Ship · Crew{" "}
+          <code>{CREW_PHONE}</code> → Crew Deck (Brand Brain).
         </p>
       </div>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -47,9 +57,25 @@ export default function SignInPage() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+15551234001"
+            placeholder={CAPTAIN_PHONE}
           />
         </label>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-2 py-1 text-slate-700"
+            onClick={() => setPhone(CAPTAIN_PHONE)}
+          >
+            Use Captain
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-2 py-1 text-slate-700"
+            onClick={() => setPhone(CREW_PHONE)}
+          >
+            Use Crew
+          </button>
+        </div>
         <button
           type="submit"
           disabled={busy}

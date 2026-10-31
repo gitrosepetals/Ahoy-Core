@@ -17,7 +17,7 @@ Deep links / universal links for magic-link auth and push payloads should use pa
 
 - `/auth/verify?token=…` — sign-in only
 - `/ship` — home
-- `/ship/queue` — approval queue (Milestone C)
+- `/ship/posts` — posts feed + approvals (Milestone C); `/ship/queue` redirects here
 - `/ship/reviews/:id` — review detail (Milestone C)
 
 Associated domains (to configure in Apple / Android consoles later): `applinks:app.ahoy.example` (placeholder).
