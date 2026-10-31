@@ -2,7 +2,7 @@
 
 Living build log for **every product/engineering slice**, including work that is not a milestone checklist item (polish, merges, test hardening, CI). Newest first.
 
-**Current version:** `0.6.92`
+**Current version:** `0.6.93`
 
 Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing polish or API surface; reserve **major** for milestone-aligned releases (A/B/C/D). Milestone gates still have their own logs ([milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md)). Outages stay in [incident_log.md](./incident_log.md).
 
@@ -26,6 +26,17 @@ Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing pol
 
 **Related:** optional links
 ```
+
+---
+
+## 0.6.93 — Fix Ruff import format in API main
+
+**Why:** CI `uv run ruff check app tests` failed (I001) after adding the marketing router.
+
+**What shipped:**
+- Multiline `app.routers` import in `apps/api/app/main.py`
+
+**How to try:** `cd apps/api && uv run ruff check app tests`
 
 ---
 

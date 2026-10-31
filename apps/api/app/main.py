@@ -5,7 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import auth, brand, campaigns, clients, devices, marketing, media, queue, reviews, roi
+from app.routers import (
+    auth,
+    brand,
+    campaigns,
+    clients,
+    devices,
+    marketing,
+    media,
+    queue,
+    reviews,
+    roi,
+)
 
 settings = get_settings()
 
