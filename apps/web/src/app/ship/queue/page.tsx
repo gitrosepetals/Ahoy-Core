@@ -8,13 +8,13 @@ function RedirectInner() {
   useEffect(() => {
     router.replace("/ship/posts?tab=pending");
   }, [router]);
-  return <main className="p-8 text-sm text-slate-600">Opening Posts…</main>;
+  return <main className="p-8 ahoy-muted">Opening Posts…</main>;
 }
 
 /** Legacy path — approval queue lives on /ship/posts now. */
 export default function ShipQueueRedirectPage() {
   return (
-    <Suspense fallback={<main className="p-8 text-sm text-slate-600">Opening Posts…</main>}>
+    <Suspense fallback={<main className="p-8 ahoy-muted">Opening Posts…</main>}>
       <RedirectInner />
     </Suspense>
   );

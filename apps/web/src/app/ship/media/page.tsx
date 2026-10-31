@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchMe, listMedia, MediaAsset } from "@/lib/api";
 import { getAccessToken } from "@/lib/session";
+import { IconChest } from "@/components/pirate/Icons";
+import { ShipHeader } from "@/components/pirate/ShipHeader";
+import { AhoyReveal } from "@/components/AhoyReveal";
 
 export default function ShipMediaPage() {
   const [media, setMedia] = useState<MediaAsset[]>([]);
@@ -27,8 +30,8 @@ export default function ShipMediaPage() {
   if (error === "Not signed in") {
     return (
       <main className="mx-auto max-w-lg px-6 py-16">
-        <p className="text-sm text-red-700">{error}</p>
-        <Link href="/auth/sign-in" className="mt-4 inline-block text-sky-800 underline">
+        <p className="ahoy-error">{error}</p>
+        <Link href="/auth/sign-in" className="ahoy-btn mt-4">
           Sign in
         </Link>
       </main>
@@ -37,17 +40,20 @@ export default function ShipMediaPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-6 py-12">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-[0.16em] text-sky-800">The Ship</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Media vault</h1>
-        <p className="ahoy-muted mt-2">Read-only view of your Crew-managed assets.</p>
-      </div>
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      <AhoyReveal variant="sail">
+        <ShipHeader icon={<IconChest />} title="The Vault">
+          <p className="ahoy-muted mt-3">Crew-stowed assets — read-only aboard the Ship.</p>
+        </ShipHeader>
+      </AhoyReveal>
+      {error && <p className="ahoy-error">{error}</p>}
       <ul className="space-y-3">
-        {media.map((a) => (
-          <li
+        {media.map((a, i) => (
+          <AhoyReveal
             key={a.asset_id}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
+            as="li"
+            variant={i % 2 === 0 ? "heave" : "sail"}
+            delay={Math.min(i * 45, 220)}
+            className="flex items-center gap-3 ahoy-panel p-3"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -56,13 +62,13 @@ export default function ShipMediaPage() {
               className="h-16 w-16 rounded-md object-cover"
             />
             <div>
-              <p className="font-medium text-slate-900">{a.asset_type}</p>
-              <p className="ahoy-muted text-sm">{(a.ai_tags || []).join(", ") || "no tags"}</p>
+              <p className="ahoy-label">{a.asset_type}</p>
+              <p className="ahoy-muted">{(a.ai_tags || []).join(", ") || "no tags"}</p>
             </div>
-          </li>
+          </AhoyReveal>
         ))}
         {media.length === 0 && !error && (
-          <li className="ahoy-muted rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center">
+          <li className="ahoy-muted rounded-xl border border-dashed border-[var(--ahoy-panel-border)] px-4 py-8 text-center">
             No media yet.
           </li>
         )}

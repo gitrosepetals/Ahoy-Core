@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { approveReviewReply, fetchMe, listReviews, ReviewItem } from "@/lib/api";
 import { getAccessToken } from "@/lib/session";
+import { IconSpyglass } from "@/components/pirate/Icons";
+import { ShipHeader } from "@/components/pirate/ShipHeader";
+import { AhoyReveal } from "@/components/AhoyReveal";
 
 export default function ShipReviewsPage() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
@@ -46,8 +49,8 @@ export default function ShipReviewsPage() {
   if (error === "Not signed in") {
     return (
       <main className="mx-auto max-w-lg px-6 py-16">
-        <p className="text-sm text-red-700">{error}</p>
-        <Link href="/auth/sign-in" className="mt-4 inline-block text-sky-800 underline">
+        <p className="ahoy-error">{error}</p>
+        <Link href="/auth/sign-in" className="ahoy-btn mt-4">
           Sign in
         </Link>
       </main>
@@ -56,47 +59,52 @@ export default function ShipReviewsPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-6 py-12">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-[0.16em] text-sky-800">The Ship</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          Reputation Radar
-        </h1>
-        <p className="ahoy-muted mt-2">
-          4–5★ drafts auto-sent in MVP stub; 1–3★ need your one-click approve.
-        </p>
-      </div>
-      {message && <p className="text-sm text-emerald-800">{message}</p>}
-      {error && error !== "Not signed in" && <p className="text-sm text-red-700">{error}</p>}
+      <AhoyReveal variant="sail">
+        <ShipHeader icon={<IconSpyglass />} title="Reputation Radar">
+          <p className="ahoy-muted mt-3">
+            Fair winds (4–5★) auto-reply in the MVP stub; storms (1–3★) wait for your mark.
+          </p>
+        </ShipHeader>
+      </AhoyReveal>
+      {message && <p className="ahoy-success">{message}</p>}
+      {error && error !== "Not signed in" && <p className="ahoy-error">{error}</p>}
       <ul className="space-y-4">
-        {reviews.map((r) => (
-          <li key={r.review_id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">
-              {r.provider} · {"★".repeat(r.rating)}
+        {reviews.map((r, i) => (
+          <AhoyReveal
+            key={r.review_id}
+            as="li"
+            variant={i % 2 === 0 ? "heave" : "drop"}
+            delay={Math.min(i * 45, 220)}
+            className="ahoy-panel p-5"
+          >
+            <p className="ahoy-label">
+              {r.provider} ·{" "}
+              <span className="text-[var(--ahoy-lantern)]">{"★".repeat(r.rating)}</span>
               {r.needs_captain ? " · needs you" : ""}
             </p>
-            <p className="mt-2 font-medium text-slate-900">{r.reviewer_name || "Guest"}</p>
+            <p className="ahoy-title-sm mt-2">{r.reviewer_name || "Guest"}</p>
             <p className="ahoy-prose mt-2">{r.body || "(no text)"}</p>
             {r.ai_reply && (
-              <div className="mt-3 rounded-md bg-slate-50 p-3">
-                <p className="text-sm font-medium text-slate-600">Draft reply</p>
-                <p className="ahoy-prose mt-1">{r.ai_reply}</p>
+              <div className="ahoy-inset mt-3">
+                <p className="ahoy-kicker">Draft reply</p>
+                <p className="ahoy-prose mt-2">{r.ai_reply}</p>
               </div>
             )}
-            <p className="ahoy-muted mt-2 text-sm">Status: {r.reply_status || "—"}</p>
+            <p className="ahoy-muted mt-2">Status: {r.reply_status || "—"}</p>
             {r.needs_captain && (
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => onApprove(r.review_id)}
-                className="mt-3 rounded-md bg-sky-800 px-4 py-2.5 text-base font-medium text-white disabled:opacity-50"
+                className="ahoy-btn mt-3"
               >
                 Approve reply
               </button>
             )}
-          </li>
+          </AhoyReveal>
         ))}
         {reviews.length === 0 && !error && (
-          <li className="ahoy-muted rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center">
+          <li className="ahoy-muted rounded-xl border border-dashed border-[var(--ahoy-panel-border)] px-4 py-8 text-center">
             No reviews yet — apply migration 004.
           </li>
         )}

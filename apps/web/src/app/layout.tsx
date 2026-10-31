@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Atkinson_Hyperlegible } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeToggleDock } from "@/components/ThemeToggle";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/**
+ * One family only — Fraunces+Atkinson was a double network hit on first paint.
+ * Size/weight scale still creates hierarchy.
+ */
+const ahoySans = Atkinson_Hyperlegible({
+  variable: "--font-ahoy-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  preload: true,
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
@@ -17,17 +22,34 @@ export const metadata: Metadata = {
   description: "Captain Ship and Crew Deck for A-hoy Marketing",
 };
 
+const themeBootScript = `
+(function(){
+  try {
+    var k = "ahoy-theme";
+    var t = localStorage.getItem(k);
+    if (t !== "light" && t !== "dark") {
+      t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${geistSans.className} antialiased bg-slate-50 text-slate-900`}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
+      <body className={`${ahoySans.variable} ${ahoySans.className} antialiased text-ahoy-ink`}>
+        <ThemeProvider>
+          <ThemeToggleDock />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

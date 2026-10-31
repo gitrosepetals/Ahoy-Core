@@ -26,14 +26,14 @@ function VerifyInner() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center justify-center px-6">
-      <p className="text-sm text-slate-700">{error ?? "Signing you in…"}</p>
+      <p className="ahoy-muted">{error ?? "Signing you in…"}</p>
     </main>
   );
 }
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={<main className="p-8 text-sm">Loading…</main>}>
+    <Suspense fallback={<main className="p-8 ahoy-muted">Loading…</main>}>
       <VerifyInner />
     </Suspense>
   );

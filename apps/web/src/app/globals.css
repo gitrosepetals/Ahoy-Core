@@ -1,39 +1,772 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --muted: #334155;
-  --font-size-base: 17px;
-  --line-height-base: 1.55;
+/*
+  Base: pure black / white via in-app data-theme (demo toggle).
+  Pirate identity lives in accents, marks, type, and short one-shot motion — not the page fill.
+*/
+
+:root,
+html[data-theme="light"] {
+  --ahoy-bg: #ffffff;
+  --ahoy-fg: #0a0a0a;
+  --ahoy-muted: #5c5c5c;
+  --ahoy-panel: #ffffff;
+  --ahoy-panel-border: #e5e5e5;
+  --ahoy-void: #0a0a0a;
+  --ahoy-hull: #141414;
+  /* Pennant crimson — not lantern orange */
+  --ahoy-lantern: #9f1239;
+  --ahoy-brass: var(--ahoy-lantern);
+  --ahoy-copper: #4c1d95; /* deep indigo fitting */
+  --ahoy-kelp: #0f766e;
+  --ahoy-sea: var(--ahoy-kelp);
+  --ahoy-sea-deep: #245445;
+  --ahoy-signal: #a33a32;
+  --ahoy-danger: var(--ahoy-signal);
+  --ahoy-foam: var(--ahoy-fg);
+  --ahoy-foam-dim: #333333;
+  --ahoy-ink: var(--ahoy-fg);
+  --ahoy-ink-soft: #444444;
+  --ahoy-deck: var(--ahoy-bg);
+  --ahoy-plank: var(--ahoy-panel);
+  --ahoy-sail: var(--ahoy-panel);
+  --ahoy-mist: var(--ahoy-bg);
+  --background: var(--ahoy-bg);
+  --foreground: var(--ahoy-fg);
+  --muted: var(--ahoy-muted);
+  --font-size-base: 18px;
+  --line-height-base: 1.6;
+  --ahoy-size-brand: clamp(2.75rem, 6vw, 4rem);
+  --ahoy-size-title: clamp(1.75rem, 3.5vw, 2.35rem);
+  --ahoy-size-title-sm: clamp(1.25rem, 2.5vw, 1.5rem);
+  --ahoy-size-kicker: 0.8125rem;
+  --ahoy-size-body: 1.125rem;
+  --ahoy-size-ui: 1rem;
+  --ahoy-size-meta: 0.9375rem;
+  --ahoy-size-nav: 0.75rem;
+}
+
+html[data-theme="dark"] {
+  --ahoy-bg: #000000;
+  --ahoy-fg: #f5f5f5;
+  --ahoy-muted: #a3a3a3;
+  --ahoy-panel: #0a0a0a;
+  --ahoy-panel-border: #262626;
+  --ahoy-void: #000000;
+  --ahoy-hull: #0a0a0a;
+  --ahoy-foam: var(--ahoy-fg);
+  --ahoy-foam-dim: #d4d4d4;
+  --ahoy-ink: var(--ahoy-fg);
+  --ahoy-ink-soft: #a3a3a3;
+  --ahoy-lantern: #fb7185; /* pennant on black deck */
+  --ahoy-brass: var(--ahoy-lantern);
+  --ahoy-copper: #a78bfa; /* indigo fitting on dark */
+  --ahoy-kelp: #2dd4bf;
+  --ahoy-sea: var(--ahoy-kelp);
+  --ahoy-sea-deep: #3d7a62;
+  --ahoy-signal: #a33a32;
+  --ahoy-danger: var(--ahoy-signal);
+  --ahoy-deck: var(--ahoy-bg);
+  --ahoy-plank: var(--ahoy-panel);
+  --ahoy-sail: var(--ahoy-panel);
+  --ahoy-mist: var(--ahoy-bg);
+  --background: var(--ahoy-bg);
+  --foreground: var(--ahoy-fg);
+  --muted: var(--ahoy-muted);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-ahoy-ink: var(--ahoy-ink);
+  --color-ahoy-sea: var(--ahoy-sea);
+  --color-ahoy-foam: var(--ahoy-foam);
+  --color-ahoy-brass: var(--ahoy-brass);
+  --font-sans: var(--font-ahoy-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Same file as body — hierarchy via size/weight, not a second download */
+  --font-display: var(--font-ahoy-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+}
+
+@keyframes ahoy-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ahoy-lantern-glow {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Scroll reveals — quiet lift only */
+.ahoy-reveal {
+  opacity: 0;
+  transition:
+    opacity 0.4s ease-out var(--ahoy-reveal-delay, 0ms),
+    transform 0.45s ease-out var(--ahoy-reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.ahoy-reveal-rise,
+.ahoy-reveal-heave,
+.ahoy-reveal-drop {
+  transform: translateY(10px);
+}
+
+.ahoy-reveal-sail {
+  transform: translateY(10px) translateX(-8px);
+}
+
+.ahoy-reveal-in {
+  opacity: 1;
+  transform: translate(0);
+  will-change: auto;
+}
+
+/* Thin voyage line (no ship mark) */
+.ahoy-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 2px;
+  background: var(--ahoy-lantern);
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Pirate Ship dotted-line tokens (brand: #808080 / 30% on light) */
+:root,
+[data-theme="light"] {
+  --ahoy-dotted-stroke: #808080;
+  --ahoy-dotted-opacity: 0.28;
+}
+
+[data-theme="dark"] {
+  --ahoy-dotted-stroke: #a3a3a3;
+  --ahoy-dotted-opacity: 0.32;
+}
+
+/* Treasure-map overlay (waves) — behind content */
+.ahoy-deck-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Crew Deck — scrolling hawsers + lantern (same motion engine as Ship waves) */
+.ahoy-crew-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ahoy-crew-bands {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(40vh, 300px);
+  overflow: hidden;
+}
+
+.ahoy-crew-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 80% 65% at 50% 32%,
+      transparent 50%,
+      color-mix(in srgb, var(--ahoy-bg) 40%, transparent) 100%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--ahoy-fg) 5%, transparent) 0%,
+      transparent 18%
+    );
+}
+
+/*
+ * Dotted slither — behind page content (under .relative.z-10).
+ * Bright enough to read in the gutters; never covers cards/nav.
+ */
+.ahoy-dotted-line {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ahoy-dotted-line-page {
+  inset: auto;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.ahoy-deck-waves {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(40vh, 300px);
+  overflow: hidden;
+}
+
+.ahoy-wave-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  width: 200%;
+  height: 100%;
+  will-change: transform;
+}
+
+.ahoy-wave-tile {
+  display: block;
+  width: 50%;
+  height: 100%;
+  flex: 0 0 50%;
+  overflow: visible;
+}
+
+.ahoy-deck-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 80% 65% at 50% 32%,
+      transparent 50%,
+      color-mix(in srgb, var(--ahoy-bg) 40%, transparent) 100%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--ahoy-fg) 5%, transparent) 0%,
+      transparent 18%
+    );
+}
+
+@keyframes ahoy-wave-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ahoy-wave-scroll-a {
+  animation: ahoy-wave-scroll 16s linear infinite;
+}
+
+.ahoy-wave-scroll-b {
+  top: 8%;
+  animation: ahoy-wave-scroll 24s linear infinite reverse;
+}
+
+.ahoy-wave-scroll-c {
+  top: 16%;
+  animation: ahoy-wave-scroll 12s linear infinite;
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+  background: var(--ahoy-bg);
+  /* Pirate waterline — accent only, not a themed fill */
+  border-top: 3px solid var(--ahoy-lantern);
 }
 
-/* Primary reading text on product surfaces */
+/* --- Type roles (use these only; avoid Tailwind text-/font- on copy) --- */
+
+.ahoy-brand,
+.ahoy-logo-word {
+  font-family: var(--font-display);
+  font-size: var(--ahoy-size-brand);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--ahoy-fg);
+  text-wrap: balance;
+}
+
+.ahoy-kicker {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-kicker);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ahoy-copper);
+}
+
+.ahoy-title {
+  font-family: var(--font-display);
+  font-size: var(--ahoy-size-title);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--ahoy-fg);
+  text-wrap: balance;
+}
+
+.ahoy-title-sm {
+  font-family: var(--font-display);
+  font-size: var(--ahoy-size-title-sm);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-stat {
+  font-family: var(--font-display);
+  font-size: var(--ahoy-size-title);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ahoy-fg);
+}
+
 .ahoy-prose {
-  font-size: 1.0625rem;
-  line-height: 1.6;
-  color: #0f172a;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-body);
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--ahoy-foam-dim);
 }
 
 .ahoy-muted {
-  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-meta);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--ahoy-muted);
+}
+
+.ahoy-label {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-meta);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ahoy-muted);
+}
+
+.ahoy-strong {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-nav-label {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-nav);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.ahoy-success,
+.ahoy-error {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-meta);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.ahoy-success {
+  color: var(--ahoy-kelp);
+}
+
+.ahoy-error {
+  color: var(--ahoy-danger);
+}
+
+/* Nested inset on panels — follows deck, not always-black void */
+.ahoy-inset {
+  border-radius: 0.25rem;
+  border: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-bg);
+  padding: 0.75rem;
+}
+
+.ahoy-panel {
+  border: 1px solid var(--ahoy-panel-border);
+  border-radius: 0.25rem;
+  background: var(--ahoy-panel);
+  box-shadow: inset 3px 0 0 var(--ahoy-copper);
+}
+
+.ahoy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 0.25rem;
+  background: var(--ahoy-lantern);
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid var(--ahoy-lantern);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ahoy-btn:hover:not(:disabled) {
+  background: #be123c;
+  border-color: #be123c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--ahoy-lantern) 35%, transparent);
+}
+
+.ahoy-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.ahoy-btn:disabled {
+  opacity: 0.5;
+}
+
+.ahoy-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 0.25rem;
+  background: transparent;
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 700;
+  color: var(--ahoy-fg);
+  border: 1px solid var(--ahoy-panel-border);
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.ahoy-btn-ghost:hover:not(:disabled) {
+  border-color: var(--ahoy-lantern);
+  color: var(--ahoy-lantern);
+  background: color-mix(in srgb, var(--ahoy-lantern) 8%, transparent);
+  transform: translateY(-2px);
+}
+
+.ahoy-btn-ghost:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ahoy-link {
+  font-family: var(--font-sans);
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--ahoy-kelp);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  transition: color 0.15s ease, text-underline-offset 0.15s ease;
+}
+
+.ahoy-link:hover {
+  color: var(--ahoy-lantern);
+  text-underline-offset: 0.28em;
+}
+
+/* Accessible return control — big hit target, clear motion */
+.ahoy-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3rem;
+  min-width: 3rem;
+  padding: 0.7rem 1.15rem 0.7rem 0.9rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-panel);
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ahoy-fg);
+  text-decoration: none;
+  box-shadow: inset 4px 0 0 var(--ahoy-copper);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ahoy-back-arrow {
+  display: inline-block;
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+
+.ahoy-back:hover {
+  border-color: var(--ahoy-lantern);
+  color: var(--ahoy-lantern);
+  background: color-mix(in srgb, var(--ahoy-lantern) 8%, var(--ahoy-panel));
+  transform: translateX(-4px);
+  box-shadow: inset 4px 0 0 var(--ahoy-lantern);
+}
+
+.ahoy-back:hover .ahoy-back-arrow {
+  transform: translateX(-5px);
+}
+
+.ahoy-back:active {
+  transform: translateX(0);
+  box-shadow: inset 4px 0 0 var(--ahoy-copper);
+}
+
+.ahoy-back:focus-visible {
+  outline: 2px solid var(--ahoy-lantern);
+  outline-offset: 2px;
+}
+
+.ahoy-input {
+  width: 100%;
+  border-radius: 0.25rem;
+  border: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-bg);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 400;
   line-height: 1.5;
-  color: #334155;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-input::placeholder {
+  color: var(--ahoy-muted);
+}
+
+.ahoy-input:focus {
+  outline: 2px solid var(--ahoy-lantern);
+  outline-offset: 1px;
+}
+
+.ahoy-tab {
+  border-radius: 0.25rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.85rem;
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-meta);
+  font-weight: 700;
+  border: 1px solid var(--ahoy-panel-border);
+  background: var(--ahoy-bg);
+  color: var(--ahoy-foam-dim);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ahoy-tab:hover:not(.ahoy-tab-active):not([aria-selected="true"]) {
+  border-color: var(--ahoy-copper);
+  color: var(--ahoy-fg);
+  transform: translateY(-1px);
+}
+
+.ahoy-tab[aria-selected="true"],
+.ahoy-tab-active {
+  background: var(--ahoy-lantern);
+  border-color: var(--ahoy-lantern);
+  color: #fff;
+}
+
+/* One-shot only — no infinite loops */
+.ahoy-rise {
+  animation: ahoy-rise 0.35s ease-out both;
+}
+
+.ahoy-rise-delay {
+  animation: ahoy-rise 0.4s ease-out 0.08s both;
+}
+
+.ahoy-brass-rule {
+  height: 2px;
+  width: 3rem;
+  background: var(--ahoy-copper);
+  margin-top: 0.75rem;
+  animation: ahoy-lantern-glow 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ahoy-rise,
+  .ahoy-rise-delay,
+  .ahoy-brass-rule {
+    animation: none;
+  }
+
+  .ahoy-reveal,
+  .ahoy-reveal-rise,
+  .ahoy-reveal-sail,
+  .ahoy-reveal-heave,
+  .ahoy-reveal-drop {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .ahoy-scroll-progress {
+    display: none;
+  }
+
+  .ahoy-wave-scroll-a,
+  .ahoy-wave-scroll-b,
+  .ahoy-wave-scroll-c {
+    animation: none;
+  }
+
+
+  .ahoy-btn,
+  .ahoy-btn-ghost,
+  .ahoy-back,
+  .ahoy-tab,
+  .ahoy-logo-link,
+  .ahoy-back-arrow {
+    transition: none;
+  }
+
+  .ahoy-btn:hover:not(:disabled),
+  .ahoy-btn-ghost:hover:not(:disabled),
+  .ahoy-back:hover,
+  .ahoy-tab:hover:not(.ahoy-tab-active):not([aria-selected="true"]),
+  .ahoy-logo-link:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.ahoy-mark {
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+  display: block;
+}
+
+.ahoy-mark-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ahoy-copper);
+}
+
+.ahoy-mark-lg {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.ahoy-mark-nav {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0 auto 0.15rem;
+}
+
+.ahoy-logo-link {
+  display: inline-flex;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.ahoy-logo-link:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+.ahoy-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-logo-mark {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  display: block;
+}
+
+.ahoy-logo-mark-lg {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.ahoy-logo-mark-sm {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.ahoy-logo-compact .ahoy-logo-word {
+  font-size: var(--ahoy-size-title-sm);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.ahoy-panel th {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-meta);
+  font-weight: 700;
+  color: var(--ahoy-muted);
+}
+
+.ahoy-panel td {
+  font-family: var(--font-sans);
+  font-size: var(--ahoy-size-ui);
+  font-weight: 400;
+  color: var(--ahoy-fg);
+}
+
+.ahoy-panel thead {
+  background: var(--ahoy-bg);
+  color: var(--ahoy-muted);
+}
+
+.ahoy-panel tbody tr {
+  border-color: var(--ahoy-panel-border);
 }

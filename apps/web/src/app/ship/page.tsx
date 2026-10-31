@@ -12,6 +12,9 @@ import {
   RoiSummary,
 } from "@/lib/api";
 import { clearAccessToken, getAccessToken } from "@/lib/session";
+import { IconCoins, IconCompass } from "@/components/pirate/Icons";
+import { ShipHeader } from "@/components/pirate/ShipHeader";
+import { AhoyReveal } from "@/components/AhoyReveal";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -31,20 +34,27 @@ export default function ShipPage() {
       setError("Not signed in");
       return;
     }
+    // Me first (paint shell), then ROI summary only — breakdown loads on demand.
     fetchMe(token)
       .then(async (profile) => {
         setMe(profile);
         const clientId = profile.clients[0]?.client_id ?? profile.user.client_ids[0];
         if (!clientId) return;
-        const [summary, days] = await Promise.all([
-          fetchRoi(token, clientId, 30),
-          fetchRoiBreakdown(token, clientId, 30),
-        ]);
-        setRoi(summary);
-        setBreakdown(days);
+        setRoi(await fetchRoi(token, clientId, 30));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
   }, []);
+
+  useEffect(() => {
+    if (!showBreakdown || breakdown.length > 0 || !me) return;
+    const token = getAccessToken();
+    if (!token) return;
+    const clientId = me.clients[0]?.client_id ?? me.user.client_ids[0];
+    if (!clientId) return;
+    fetchRoiBreakdown(token, clientId, 30)
+      .then(setBreakdown)
+      .catch(() => setBreakdown([]));
+  }, [showBreakdown, breakdown.length, me]);
 
   async function registerDevPush() {
     const token = getAccessToken();
@@ -63,8 +73,8 @@ export default function ShipPage() {
   if (error === "Not signed in") {
     return (
       <main className="mx-auto max-w-lg px-6 py-16">
-        <p className="text-sm text-red-700">{error}</p>
-        <Link href="/auth/sign-in" className="mt-4 inline-block text-sky-800 underline">
+        <p className="ahoy-error">{error}</p>
+        <Link href="/auth/sign-in" className="ahoy-btn mt-4">
           Sign in
         </Link>
       </main>
@@ -72,115 +82,115 @@ export default function ShipPage() {
   }
 
   if (!me) {
-    return <main className="p-8 text-sm text-slate-600">Loading Ship…</main>;
+    return <main className="p-8 ahoy-muted">Loading the Ship…</main>;
   }
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-6 py-12">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-[0.16em] text-sky-800">The Ship</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          Treasure Map
-        </h1>
-        <p className="ahoy-muted mt-2">
-          Ahoy, Captain {me.user.full_name}
-          {me.clients[0] ? ` · ${me.clients[0].business_name}` : ""}.
-        </p>
-      </div>
+      <AhoyReveal variant="sail">
+        <ShipHeader icon={<IconCompass />} title="Treasure Map">
+          <p className="ahoy-muted mt-3">
+            Ahoy, Captain {me.user.full_name}
+            {me.clients[0] ? ` · ${me.clients[0].business_name}` : ""}.
+          </p>
+        </ShipHeader>
+      </AhoyReveal>
 
-      {error && error !== "Not signed in" && <p className="text-sm text-red-700">{error}</p>}
+      {error && error !== "Not signed in" && (
+        <p className="ahoy-error">{error}</p>
+      )}
 
       {roi ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setShowBreakdown((v) => !v)}
-            className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm"
-          >
-            <p className="text-sm font-medium text-slate-600">
-              {roi.using_pos ? "POS revenue" : "Estimated revenue"}
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">
-              {money(roi.estimated_revenue_usd)}
-            </p>
-            <p className="ahoy-muted mt-2 text-sm">
-              Last {roi.days} days · tap for breakdown
-            </p>
-          </button>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">Total leads</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{roi.total_leads}</p>
-            <p className="ahoy-muted mt-2 text-sm">
-              {roi.total_calls} calls · {roi.total_form_leads} forms
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">New reviews</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{roi.total_reviews}</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">Ad spend</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">
-              {money(roi.total_ad_spend_usd)}
-            </p>
-          </div>
+          <AhoyReveal variant="heave" delay={40}>
+            <button
+              type="button"
+              onClick={() => setShowBreakdown((v) => !v)}
+              className="ahoy-panel p-4 text-left w-full"
+            >
+              <p className="flex items-center gap-2 ahoy-label">
+                <IconCoins className="ahoy-mark text-[var(--ahoy-brass)]" />
+                {roi.using_pos ? "POS revenue" : "Estimated revenue"}
+              </p>
+              <p className="ahoy-stat mt-2">{money(roi.estimated_revenue_usd)}</p>
+              <p className="ahoy-muted mt-2">Last {roi.days} days · tap for breakdown</p>
+            </button>
+          </AhoyReveal>
+          <AhoyReveal variant="sail" delay={90}>
+            <div className="ahoy-panel p-4">
+              <p className="ahoy-label">Total leads</p>
+              <p className="ahoy-stat mt-2">{roi.total_leads}</p>
+              <p className="ahoy-muted mt-2">
+                {roi.total_calls} calls · {roi.total_form_leads} forms
+              </p>
+            </div>
+          </AhoyReveal>
+          <AhoyReveal variant="heave" delay={140}>
+            <div className="ahoy-panel p-4">
+              <p className="ahoy-label">New reviews</p>
+              <p className="ahoy-stat mt-2">{roi.total_reviews}</p>
+            </div>
+          </AhoyReveal>
+          <AhoyReveal variant="sail" delay={190}>
+            <div className="ahoy-panel p-4">
+              <p className="ahoy-label">Ad spend</p>
+              <p className="ahoy-stat mt-2">{money(roi.total_ad_spend_usd)}</p>
+            </div>
+          </AhoyReveal>
         </div>
       ) : (
-        <p className="ahoy-muted">Loading Treasure Map…</p>
+        <p className="ahoy-muted">Unfurling the Treasure Map…</p>
       )}
 
       {showBreakdown && (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-slate-900">Daily breakdown</h2>
-          <p className="ahoy-muted mt-1 text-sm">
-            Est. = (calls + forms) × {((roi?.conversion_rate_estimate ?? 0.25) * 100).toFixed(0)}% ×{" "}
-            {money(roi?.average_ticket_value ?? 150)}
-          </p>
-          <ul className="mt-3 space-y-2">
-            {breakdown.map((d) => (
-              <li
-                key={d.metric_date}
-                className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-2 text-sm"
-              >
-                <span className="font-medium text-slate-800">{d.metric_date}</span>
-                <span className="text-slate-600">
-                  {d.tracked_calls_count} calls · {d.form_leads_count} forms ·{" "}
-                  {money(d.estimated_revenue_usd)}
-                </span>
-              </li>
-            ))}
-            {breakdown.length === 0 && (
-              <li className="ahoy-muted py-2">No daily metrics in this window.</li>
-            )}
-          </ul>
-        </section>
+        <AhoyReveal variant="drop">
+          <section className="ahoy-panel p-4">
+            <h2 className="ahoy-title-sm">Daily breakdown</h2>
+            <p className="ahoy-muted mt-1">
+              Est. = (calls + forms) × {((roi?.conversion_rate_estimate ?? 0.25) * 100).toFixed(0)}% ×{" "}
+              {money(roi?.average_ticket_value ?? 150)}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {breakdown.map((d) => (
+                <li
+                  key={d.metric_date}
+                  className="flex flex-wrap justify-between gap-2 border-t border-[var(--ahoy-panel-border)] py-2"
+                >
+                  <span className="ahoy-label">{d.metric_date}</span>
+                  <span className="ahoy-muted">
+                    {d.tracked_calls_count} calls · {d.form_leads_count} forms ·{" "}
+                    {money(d.estimated_revenue_usd)}
+                  </span>
+                </li>
+              ))}
+              {breakdown.length === 0 && (
+                <li className="ahoy-muted py-2">No daily metrics in this window.</li>
+              )}
+            </ul>
+          </section>
+        </AhoyReveal>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href="/ship/posts?tab=pending"
-          className="rounded-md bg-sky-800 px-4 py-2.5 text-base font-medium text-white"
-        >
-          Open posts
-        </Link>
-        <button
-          type="button"
-          onClick={registerDevPush}
-          className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-medium text-slate-800"
-        >
-          Register push token (dev)
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            clearAccessToken();
-            window.location.href = "/auth/sign-in";
-          }}
-          className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-medium text-slate-800"
-        >
-          Sign out
-        </button>
-      </div>
+      <AhoyReveal variant="heave" delay={80}>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/ship/posts?tab=pending" className="ahoy-btn">
+            Open the Manifest
+          </Link>
+          <button type="button" onClick={registerDevPush} className="ahoy-btn-ghost">
+            Register push token (dev)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              clearAccessToken();
+              window.location.href = "/auth/sign-in";
+            }}
+            className="ahoy-btn-ghost"
+          >
+            Sign out
+          </button>
+        </div>
+      </AhoyReveal>
       {pushStatus && <p className="ahoy-muted">{pushStatus}</p>}
     </main>
   );
