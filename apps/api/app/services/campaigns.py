@@ -9,12 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.models import (
     ApprovalStatus,
-    BrandProfile,
     ContentQueue,
     MediaAsset,
     PlatformChannel,
 )
+from app.services.brand_context import load_brand_context
 from app.services.llm import generate_caption, revise_caption
+
+MAX_POSTS_PER_BATCH = 60
 
 
 async def generate_campaign_posts(
@@ -26,13 +28,14 @@ async def generate_campaign_posts(
     channels: list[PlatformChannel],
     days: int,
     count: int,
+    fan_out: bool = False,
 ) -> list[ContentQueue]:
-    brand = (
-        await db.execute(select(BrandProfile).where(BrandProfile.client_id == client_id))
-    ).scalar_one_or_none()
-    voice = brand.brand_voice_guidelines if brand else "Warm, professional, community-focused."
-    compliance = brand.compliance_rules if brand else None
-    services = brand.services_offered if brand else None
+    """Create draft posts.
+
+    Default: ``count`` posts, channels round-robin. With ``fan_out`` (AG-03 "single batch"),
+    each of the ``count`` slots gets one formatted variation per channel, sharing asset + time.
+    """
+    brand = await load_brand_context(db, client_id)
 
     assets: list[MediaAsset] = []
     if asset_ids:
@@ -49,36 +52,48 @@ async def generate_campaign_posts(
 
     if not channels:
         channels = [PlatformChannel.instagram_post]
+    channels = list(dict.fromkeys(channels))
+    if fan_out and count * len(channels) > MAX_POSTS_PER_BATCH:
+        raise ValueError(
+            f"Batch too large: {count} slots × {len(channels)} channels > {MAX_POSTS_PER_BATCH}"
+        )
 
     now = datetime.now(UTC)
     spacing = max(days / max(count, 1), 0.25)
+    batch_id = str(uuid.uuid4())
     posts: list[ContentQueue] = []
 
     for i in range(count):
-        channel = channels[i % len(channels)]
         asset = assets[i % len(assets)] if assets else None
-        caption, meta = await generate_caption(
-            settings,
-            brand_voice=voice,
-            compliance=compliance,
-            services=services,
-            channel=channel.value,
-            asset_tags=asset.ai_tags if asset else None,
-            asset_notes=(asset.transcript or asset.storage_url) if asset else "text-only",
-            index=i,
-        )
+        slot_channels = channels if fan_out else [channels[i % len(channels)]]
         scheduled = now + timedelta(days=spacing * (i + 1))
-        post = ContentQueue(
-            client_id=client_id,
-            asset_id=asset.asset_id if asset else None,
-            channel=channel,
-            caption_text=caption,
-            scheduled_publish_at=scheduled,
-            status=ApprovalStatus.draft_internal,
-            generation_meta={**meta, "batch_index": i, "days": days, "count": count},
-        )
-        db.add(post)
-        posts.append(post)
+        for channel in slot_channels:
+            caption, meta = await generate_caption(
+                settings,
+                brand=brand,
+                channel=channel.value,
+                asset_tags=asset.ai_tags if asset else None,
+                asset_notes=(asset.transcript or asset.storage_url) if asset else "text-only",
+                index=i,
+            )
+            post = ContentQueue(
+                client_id=client_id,
+                asset_id=asset.asset_id if asset else None,
+                channel=channel,
+                caption_text=caption,
+                scheduled_publish_at=scheduled,
+                status=ApprovalStatus.draft_internal,
+                generation_meta={
+                    **meta,
+                    "batch_id": batch_id,
+                    "batch_index": i,
+                    "days": days,
+                    "count": count,
+                    "fan_out": fan_out,
+                },
+            )
+            db.add(post)
+            posts.append(post)
         if asset:
             asset.is_used = True
 
@@ -92,16 +107,12 @@ async def rewrite_post_from_feedback(
     post: ContentQueue,
     feedback: str,
 ) -> ContentQueue:
-    brand = (
-        await db.execute(select(BrandProfile).where(BrandProfile.client_id == post.client_id))
-    ).scalar_one_or_none()
-    voice = brand.brand_voice_guidelines if brand else "Warm, professional, community-focused."
-    compliance = brand.compliance_rules if brand else None
+    brand = await load_brand_context(db, post.client_id)
 
     revised, meta = await revise_caption(
         settings,
-        brand_voice=voice,
-        compliance=compliance,
+        brand=brand,
+        channel=post.channel.value,
         caption=post.caption_text,
         feedback=feedback,
     )
@@ -120,4 +131,26 @@ async def rewrite_post_from_feedback(
         post.generation_meta = prev_meta
 
     await db.flush()
+    return post
+
+
+def crew_edit_caption(
+    post: ContentQueue,
+    caption: str,
+    *,
+    scheduled_publish_at: datetime | None = None,
+) -> ContentQueue:
+    """Crew hand-edit (Story 1.2 fallback when the AI rewrite was flagged) or reschedule."""
+    now = datetime.now(UTC)
+    post.caption_text = caption
+    meta = dict(post.generation_meta or {})
+    meta["needs_crew"] = False
+    meta["crew_edited_at"] = now.isoformat()
+    post.generation_meta = meta
+    if scheduled_publish_at is not None:
+        post.scheduled_publish_at = scheduled_publish_at
+    if post.status in (ApprovalStatus.changes_requested, ApprovalStatus.expired):
+        post.status = ApprovalStatus.pending_client
+        post.released_at = now
+        post.reminder_sent_at = None
     return post

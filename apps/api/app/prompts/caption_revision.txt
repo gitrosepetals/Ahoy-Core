@@ -1,10 +1,12 @@
-Revise this social caption using the Captain's feedback. Keep brand voice and compliance.
+Revise this marketing caption using the Captain's (business owner's) feedback. Keep the brand voice, follow compliance, and use only facts from the Brand Brain.
 
-Brand voice:
-{brand_voice}
+=== Brand Brain ===
+{brand_context}
+===
 
-Compliance:
-{compliance}
+Channel: {channel}
+Format rules for this channel:
+{channel_rules}
 
 Original caption:
 {caption}

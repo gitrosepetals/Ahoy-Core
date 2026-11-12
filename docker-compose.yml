@@ -10,8 +10,9 @@ services:
       POSTGRES_DB: ahoy
     volumes:
       - ahoy_pg:/var/lib/postgresql/data
-      - ./packages/db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
-      - ./packages/db/migrations/002_seed_oak_lawn.sql:/docker-entrypoint-initdb.d/002_seed_oak_lawn.sql:ro
+      # Every migration runs (in filename order) on first boot of an empty volume only.
+      # Existing volumes: apply new files by hand, see packages/db/README.md.
+      - ./packages/db/migrations:/docker-entrypoint-initdb.d:ro
 
 volumes:
   ahoy_pg:

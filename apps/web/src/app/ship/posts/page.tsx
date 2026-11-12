@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -12,9 +12,10 @@ import {
   listQueue,
   MediaAsset,
   requestEdit,
+  requestEditVoice,
   swapAsset,
 } from "@/lib/api";
-import { getAccessToken } from "@/lib/session";
+import { getAccessToken, pickActiveClient } from "@/lib/session";
 import { IconScroll } from "@/components/pirate/Icons";
 import { ShipHeader } from "@/components/pirate/ShipHeader";
 import { AhoyReveal } from "@/components/AhoyReveal";
@@ -45,6 +46,63 @@ function relativeTime(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
+const MAX_VOICE_SECONDS = 30;
+const SWIPE_APPROVE_PX = 90;
+
+/** Story 1.2: tap to record a short voice note, tap again (or 30s) to send. */
+function VoiceNoteButton({ busy, onRecorded }: { busy: boolean; onRecorded: (b: Blob) => void }) {
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function start() {
+    setError(null);
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setError("Voice notes aren’t supported in this browser — type your edit instead.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = ["audio/webm", "audio/mp4", "audio/ogg"].find((m) => MediaRecorder.isTypeSupported(m));
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        if (chunks.length) onRecorded(new Blob(chunks, { type: (rec.mimeType || "audio/webm").split(";")[0] }));
+      };
+      recorder.current = rec;
+      rec.start();
+      setRecording(true);
+      timer.current = setTimeout(() => stop(), MAX_VOICE_SECONDS * 1000);
+    } catch {
+      setError("Microphone permission was denied.");
+    }
+  }
+
+  function stop() {
+    if (timer.current) clearTimeout(timer.current);
+    if (recorder.current?.state === "recording") recorder.current.stop();
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy && !recording}
+        onClick={recording ? stop : start}
+        className={recording ? "ahoy-btn" : "ahoy-btn-ghost"}
+        aria-pressed={recording}
+      >
+        {recording ? "■ Stop & send" : "🎙️ Voice note"}
+      </button>
+      {error && <p className="ahoy-error w-full">{error}</p>}
+    </>
+  );
+}
+
 function PostActions({
   postId,
   busy,
@@ -54,6 +112,7 @@ function PostActions({
   onFeedback,
   onApprove,
   onRequestEdit,
+  onVoiceNote,
   onToggleSwap,
   onSwap,
 }: {
@@ -65,6 +124,7 @@ function PostActions({
   onFeedback: (value: string) => void;
   onApprove: () => void;
   onRequestEdit: () => void;
+  onVoiceNote: (audio: Blob) => void;
   onToggleSwap: () => void;
   onSwap: (assetId: string) => void;
 }) {
@@ -73,7 +133,7 @@ function PostActions({
       <textarea
         className="ahoy-input mt-3"
         rows={2}
-        placeholder="Feedback for request edit…"
+        placeholder="What should change? Type it, or record a voice note…"
         value={feedback}
         onChange={(e) => onFeedback(e.target.value)}
       />
@@ -84,6 +144,7 @@ function PostActions({
         <button type="button" disabled={busy} onClick={onRequestEdit} className="ahoy-btn-ghost">
           Request edit
         </button>
+        <VoiceNoteButton busy={busy} onRecorded={onVoiceNote} />
         <button
           type="button"
           disabled={busy || media.length === 0}
@@ -163,7 +224,7 @@ function ShipPostsInner() {
       return;
     }
     const me = await fetchMe(token);
-    const client = me.clients[0];
+    const client = pickActiveClient(me);
     const cid = client?.client_id ?? me.user.client_ids[0] ?? null;
     setClientId(cid);
     if (client?.business_name) setBusinessName(client.business_name);
@@ -217,15 +278,52 @@ function ShipPostsInner() {
       prev.map((p) => (p.post_id === postId ? { ...p, status: "approved" } : p)),
     );
     try {
-      await approvePost(token, postId);
+      const updated = await approvePost(token, postId);
+      setPosts((prev) => prev.map((p) => (p.post_id === postId ? updated : p)));
       setMessage("Approved.");
-      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approve failed");
       await load();
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onVoiceNote(postId: string, audio: Blob) {
+    const token = getAccessToken();
+    if (!token) return;
+    setBusy(true);
+    setError(null);
+    setMessage("Listening to your note…");
+    try {
+      const updated = await requestEditVoice(token, postId, audio);
+      setPosts((prev) => prev.map((p) => (p.post_id === postId ? updated : p)));
+      setMessage(
+        updated.status === "pending_client"
+          ? `Rewritten from your note (“${updated.client_feedback ?? ""}”) — take a look.`
+          : "Got your note — your Crew will make the change.",
+      );
+    } catch (err) {
+      setMessage(null);
+      setError(err instanceof Error ? err.message : "Voice note failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Story 1.1: swipe a card right to approve it (feed view, touch devices)
+  const swipeStart = useRef<{ id: string; x: number; y: number } | null>(null);
+  function onTouchStart(postId: string, e: React.TouchEvent) {
+    const t = e.touches[0];
+    swipeStart.current = { id: postId, x: t.clientX, y: t.clientY };
+  }
+  function onTouchEnd(postId: string, e: React.TouchEvent) {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || start.id !== postId || busy) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    if (dx > SWIPE_APPROVE_PX && Math.abs(t.clientY - start.y) < dx / 2) void onApprove(postId);
   }
 
   async function onApproveAll() {
@@ -308,7 +406,7 @@ function ShipPostsInner() {
         <ShipHeader icon={<IconScroll />} title="Manifest">
           <p className="ahoy-muted mt-3">
             {isFeed
-              ? "Your feed — approve, edit, or swap before it sails."
+              ? "Your feed — approve (or swipe right), edit, or swap before it sails."
               : "Captions awaiting your mark — and the ones already cleared for sail."}
           </p>
         </ShipHeader>
@@ -388,13 +486,18 @@ function ShipPostsInner() {
               }
               onApprove={() => onApprove(p.post_id)}
               onRequestEdit={() => onRequestEdit(p.post_id)}
+              onVoiceNote={(audio) => onVoiceNote(p.post_id, audio)}
               onToggleSwap={() => setSwapFor(swapFor === p.post_id ? null : p.post_id)}
               onSwap={(assetId) => onSwap(p.post_id, assetId)}
             />
           ) : null;
 
           const body = isFeed ? (
-            <article className="ahoy-feed-post">
+            <article
+              className="ahoy-feed-post"
+              onTouchStart={actionable ? (e) => onTouchStart(p.post_id, e) : undefined}
+              onTouchEnd={actionable ? (e) => onTouchEnd(p.post_id, e) : undefined}
+            >
               <header className="ahoy-feed-head">
                 <span className="ahoy-feed-avatar" aria-hidden>
                   {mark}

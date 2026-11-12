@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Atkinson_Hyperlegible } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggleDock } from "@/components/ThemeToggle";
+import { ErrorReporting } from "@/components/ErrorReporting";
 import "./globals.css";
 
 /**
@@ -20,6 +21,8 @@ const ahoySans = Atkinson_Hyperlegible({
 export const metadata: Metadata = {
   title: "A-hoy",
   description: "Captain Ship and Crew Deck for A-hoy Marketing",
+  appleWebApp: { capable: true, title: "A-hoy", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 const themeBootScript = `
@@ -47,6 +50,7 @@ export default function RootLayout({
       </head>
       <body className={`${ahoySans.variable} ${ahoySans.className} antialiased text-ahoy-ink`}>
         <ThemeProvider>
+          <ErrorReporting />
           <ThemeToggleDock />
           {children}
         </ThemeProvider>

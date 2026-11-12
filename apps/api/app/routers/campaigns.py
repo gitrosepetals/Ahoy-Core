@@ -43,6 +43,7 @@ async def generate_campaign(
             channels=body.channels,
             days=body.days,
             count=body.count,
+            fan_out=body.fan_out,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

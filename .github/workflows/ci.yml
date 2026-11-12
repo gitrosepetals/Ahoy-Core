@@ -11,8 +11,31 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ahoy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ahoy
+      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
+      - name: Apply migrations
+        working-directory: packages/db/migrations
+        run: |
+          for f in $(ls *.sql | sort); do
+            psql -h localhost -U postgres -d ahoy -v ON_ERROR_STOP=1 -f "$f"
+          done
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -24,6 +47,7 @@ jobs:
           uv run pytest -m milestone_c
           uv run pytest -m integration_ab
           uv run pytest -m integration_abc
+          uv run pytest -m milestone_d
           uv run pytest
           uv run ruff check app tests
 

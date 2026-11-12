@@ -7,6 +7,8 @@ from sqlalchemy import select
 from app.deps import AppSettings, CrewUser, DbSession, TenantClientId, require_roles
 from app.models import MediaAsset, MediaType, UserRole
 from app.schemas import AuthUser, MediaAssetOut, MediaRegisterRequest
+from app.services.llm import tag_asset
+from app.services.storage import StorageError, save_file
 
 router = APIRouter(prefix="/clients", tags=["media"])
 
@@ -71,22 +73,22 @@ async def upload_media(
     file: UploadFile = File(...),
     asset_type: MediaType = Form(MediaType.raw_photo),
 ) -> MediaAssetOut:
-    upload_root = Path(settings.upload_dir)
-    if not upload_root.is_absolute():
-        upload_root = Path.cwd() / upload_root
-    client_dir = upload_root / str(client_id)
-    client_dir.mkdir(parents=True, exist_ok=True)
-
     suffix = Path(file.filename or "upload.bin").suffix or ".bin"
     asset_id = uuid.uuid4()
-    dest = client_dir / f"{asset_id}{suffix}"
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty upload")
-    dest.write_bytes(data)
+    name = f"{asset_id}{suffix}"
+    try:
+        storage_url = await save_file(
+            settings, key=f"{client_id}/{name}", data=data, content_type=file.content_type
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    public_base = settings.public_api_base_url.rstrip("/")
-    storage_url = f"{public_base}/uploads/{client_id}/{dest.name}"
+    tags, _tag_meta = await tag_asset(
+        settings, filename=file.filename or name, data=data, content_type=file.content_type
+    )
 
     asset = MediaAsset(
         asset_id=asset_id,
@@ -94,7 +96,7 @@ async def upload_media(
         storage_url=storage_url,
         thumbnail_url=storage_url,
         asset_type=asset_type,
-        ai_tags=["uploaded"],
+        ai_tags=tags,
     )
     db.add(asset)
     await db.commit()

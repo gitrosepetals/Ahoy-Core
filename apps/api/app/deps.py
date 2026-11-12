@@ -10,6 +10,7 @@ from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import Client, UserRole
 from app.schemas import AuthUser
+from app.services.audit import set_actor
 from app.services.auth import load_user_from_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -25,9 +26,11 @@ async def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
-        return await load_user_from_token(db, credentials.credentials, settings)
+        user = await load_user_from_token(db, credentials.credentials, settings)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    set_actor(user.user_id, user.role.value)  # audit log attribution for this request
+    return user
 
 
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]

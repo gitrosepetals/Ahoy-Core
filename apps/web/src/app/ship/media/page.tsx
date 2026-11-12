@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchMe, listMedia, MediaAsset } from "@/lib/api";
-import { getAccessToken } from "@/lib/session";
+import { activeClientId, getAccessToken } from "@/lib/session";
 import { IconChest } from "@/components/pirate/Icons";
 import { ShipHeader } from "@/components/pirate/ShipHeader";
 import { AhoyReveal } from "@/components/AhoyReveal";
@@ -20,7 +20,7 @@ export default function ShipMediaPage() {
     }
     fetchMe(token)
       .then(async (me) => {
-        const cid = me.clients[0]?.client_id ?? me.user.client_ids[0];
+        const cid = activeClientId(me);
         if (!cid) return;
         setMedia(await listMedia(token, cid));
       })

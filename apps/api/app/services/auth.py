@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.models import AuthMagicLink, Client, Session, User, UserRole
 from app.schemas import AuthUser
+from app.services.sms import send_sms, sms_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -77,15 +78,17 @@ async def find_user_for_magic_link(
     return result.scalar_one_or_none()
 
 
-async def issue_magic_link(
+async def create_magic_link(
     db: AsyncSession,
     *,
     user: User,
     redirect_path: str,
     settings: Settings,
+    ttl: timedelta | None = None,
 ) -> tuple[str, AuthMagicLink]:
+    """Persist a single-use link and return its URL (does not send it)."""
     raw = secrets.token_urlsafe(32)
-    expires_at = datetime.now(UTC) + timedelta(minutes=settings.magic_link_ttl_minutes)
+    expires_at = datetime.now(UTC) + (ttl or timedelta(minutes=settings.magic_link_ttl_minutes))
     link = AuthMagicLink(
         user_id=user.user_id,
         token_hash=hash_token(raw),
@@ -93,30 +96,33 @@ async def issue_magic_link(
         expires_at=expires_at,
     )
     db.add(link)
-    await db.commit()
+    await db.flush()
 
     base = settings.ship_app_base_url if user.role == UserRole.captain else settings.crew_app_base_url
-    verify_url = f"{base}/auth/verify?token={raw}"
+    return f"{base}/auth/verify?token={raw}", link
 
-    if settings.auth_dev_mode or not settings.twilio_account_sid:
+
+async def issue_magic_link(
+    db: AsyncSession,
+    *,
+    user: User,
+    redirect_path: str,
+    settings: Settings,
+) -> tuple[str, AuthMagicLink]:
+    """Sign-in link (30 min) sent by SMS, or logged in dev."""
+    verify_url, link = await create_magic_link(
+        db, user=user, redirect_path=redirect_path, settings=settings
+    )
+    await db.commit()
+
+    if not sms_enabled(settings):
         logger.info("DEV magic link for %s (%s): %s", user.email, user.role.value, verify_url)
     else:
-        await _send_twilio_sms(user.phone_number, verify_url, settings)
+        if not user.phone_number:
+            raise ValueError("User has no phone number for magic link SMS")
+        await send_sms(settings, to=user.phone_number, body=f"Ahoy, Captain! Tap to board your Ship: {verify_url}")
 
     return verify_url, link
-
-
-async def _send_twilio_sms(phone: str | None, verify_url: str, settings: Settings) -> None:
-    if not phone:
-        raise ValueError("User has no phone number for magic link SMS")
-    from twilio.rest import Client as TwilioClient
-
-    client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
-    client.messages.create(
-        body=f"Ahoy! Sign in to your Ship: {verify_url}",
-        from_=settings.twilio_from_number,
-        to=phone,
-    )
 
 
 async def consume_magic_link(

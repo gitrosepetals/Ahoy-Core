@@ -252,12 +252,15 @@ Details: [milestone_b.md](./milestone_b.md).
 
 Details: [milestone_c.md](./milestone_c.md).
 
-### Milestone D — Pilot hardening (week 5–8)
-1. Stripe subscription ↔ `subscription_tier`.
-2. Ayrshare publish job for `approved` posts at `scheduled_publish_at`.
-3. Twilio call tracking → `lead_events` → nightly rollup into `daily_roi_metrics`.
-4. Observability: structured logs, Sentry (web + Capacitor), push delivery metrics, basic admin audit of status transitions.
-5. Pilot with 5–10 local SMBs on the **installed Ship**; measure KPIs from PRD §7 (time-to-approve, push open rate / app interaction rate).
+### Milestone D — Pilot hardening + Phase 1 PRD gaps (week 5–8) — **DONE** (code, 1.0.0); pilot rollout pending
+1. Stripe subscription ↔ `subscription_tier` — 0.13.0.
+2. Ayrshare publish job for `approved` posts at `scheduled_publish_at` — 0.9.0 (worker).
+3. Twilio call tracking → `lead_events` → **hourly** idempotent rollup into `daily_roi_metrics` — 0.10.0.
+4. Observability: JSON logs, Sentry (API, worker, web), notification delivery log, audit of status transitions — 0.8.0 / 0.15.0.
+5. Pilot with 5–10 local SMBs on the **installed Ship**; KPIs from PRD §7 via `GET /kpis` + Crew Deck panel — tooling 1.0.0; rollout is an operations step.
+6. Added from the 2026-11-01 PRD audit: ROI correctness, full Brand Brain context, multi-channel generator, real notifications + 48h queue link, queue expiry, review sync + replies, voice notes, business switcher, PWA, terminology sweep.
+
+Details, design decisions and per-release log: [milestone_d.md](./milestone_d.md), [iterations.md](./iterations.md). Provider setup: [integrations_setup.md](./integrations_setup.md).
 
 **Explicitly out of Phase 1 code path (stubs only):** Flare Gun (`CL-04`), shoot booking (`CL-03`), FFmpeg/Whisper media multiplier (`AG-02`), POS attribution, automated ad launch.
 
@@ -265,14 +268,19 @@ Details: [milestone_c.md](./milestone_c.md).
 
 ## Key API Surface (FastAPI)
 
-- `POST /auth/magic-link` · `GET /auth/verify` (Captain sign-in)
-- `POST /devices/push-token` · `DELETE /devices/push-token`
-- `GET /clients/{id}/roi` · `GET /clients/{id}/roi/breakdown`
-- `GET /clients/{id}/queue` · `POST /queue/{post_id}/approve` · `POST /queue/{post_id}/request-edit` · `POST /queue/{post_id}/swap-asset`
-- `GET/POST /clients/{id}/brand-profile`
-- `POST /clients/{id}/campaigns/generate` (Crew)
-- `GET /clients/{id}/reviews` · `POST /reviews/{id}/approve-reply`
-- Webhooks: `POST /webhooks/twilio/sms` · `POST /webhooks/twilio/voice` · `POST /webhooks/ayrshare`
+All under `/api/v1`. Full schema: `/docs` (OpenAPI).
+
+- **Auth:** `POST /auth/magic-link` · `GET /auth/verify` · `GET /auth/me`
+- **Devices:** `POST /devices/push-token` · `DELETE /devices/push-token`
+- **Clients (Crew):** `GET /clients` · `GET /clients/{id}` · `GET|PATCH /clients/{id}/settings` · `GET /clients/{id}/notifications` · `GET /clients/{id}/audit` · `GET /kpis`
+- **Integrations (Crew):** `GET /clients/{id}/integrations` · `PUT …/integrations/ayrshare` · `PUT …/integrations/facebook` · `GET …/integrations/google/start` · `GET …/integrations/google/locations` · `GET /integrations/google/callback`
+- **ROI:** `GET /clients/{id}/roi` · `…/roi/breakdown` · `…/roi/leads` · `GET /clients/{id}/leads/{event}/recording` · `PUT /clients/{id}/roi/manual` (Crew)
+- **Brand / media / campaigns:** `GET|PUT /clients/{id}/brand-profile` · `GET|POST /clients/{id}/media` · `POST …/media/upload` · `POST /clients/{id}/campaigns/generate`
+- **Queue:** `GET /clients/{id}/queue` · `POST …/queue/release` · `POST …/queue/approve-all` · `POST /queue/{id}/approve` · `…/request-edit` · `…/request-edit-voice` · `…/swap-asset` · `PUT /queue/{id}/caption` (Crew) · `POST /queue/{id}/publish-retry` · `…/mark-published` (Crew)
+- **Reviews:** `GET /clients/{id}/reviews` · `POST /clients/{id}/reviews/sync` (Crew) · `POST /reviews/{id}/approve-reply` · `…/skip-reply`
+- **Billing:** `GET /clients/{id}/billing` · `POST …/billing/checkout` · `…/billing/portal` · `…/billing/ad-spend` (Crew)
+- **Webhooks:** `POST /webhooks/twilio/voice` · `…/twilio/voice/complete` · `…/twilio/recording` · `POST /webhooks/forms/{key}` · `POST /webhooks/stripe`
+- **Worker (`python -m app.worker`):** publish due posts (1m) · queue reminders + expiry (5m) · lead rollup (1h) · review sync (30m) · due review replies (5m) · GBP performance (6h)
 
 Status machine for content:
 
@@ -282,8 +290,11 @@ stateDiagram-v2
   draft_internal --> pending_client: Crew releases batch
   pending_client --> approved: Captain approves
   pending_client --> changes_requested: Captain requests edit
-  changes_requested --> pending_client: Rewrite ready
-  approved --> published: Scheduler publishes
+  changes_requested --> pending_client: Rewrite ready / Crew edit
+  pending_client --> expired: Publish time passed unapproved
+  changes_requested --> expired: Publish time passed unapproved
+  expired --> pending_client: Crew reschedules
+  approved --> published: Worker publishes (Ayrshare) / Crew marks sent
 ```
 
 ---

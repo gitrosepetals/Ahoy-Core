@@ -10,7 +10,7 @@ cp .env.example .env
 uv sync
 ```
 
-Apply DB migrations (Postgres with `pgvector`):
+Apply DB migrations (Postgres with `pgvector`) — all files in `packages/db/migrations/` in order (see `packages/db/README.md`); e.g.:
 
 ```bash
 psql "$DATABASE_URL_PSQL" -f ../../packages/db/migrations/001_initial_schema.sql
@@ -24,6 +24,17 @@ uv run uvicorn app.main:app --reload --port 8000
 ```
 
 Docs: http://localhost:8000/docs
+
+Background jobs (publishing, queue reminders/expiry, later rollups and review sync):
+
+```bash
+uv run python -m app.worker          # loop
+uv run python -m app.worker --once   # run every job once
+```
+
+or set `EMBEDDED_WORKER=true` to run the loop inside the API process (single instance only is fine either way — jobs take a Postgres advisory lock).
+
+Endpoint overview: [docs/technical_implementation_plan.md § Key API Surface](../../docs/technical_implementation_plan.md#key-api-surface-fastapi). Provider setup: [docs/integrations_setup.md](../../docs/integrations_setup.md).
 
 ## Milestone A endpoints
 

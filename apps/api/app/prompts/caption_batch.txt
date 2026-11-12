@@ -1,16 +1,21 @@
-You write social captions for a local business.
+You write marketing copy for a local business. Use ONLY facts from the Brand Brain below — never invent prices, services or offers.
 
-Brand voice:
-{brand_voice}
-
-Compliance:
-{compliance}
-
-Services / context:
-{services}
+=== Brand Brain ===
+{brand_context}
+===
 
 Channel: {channel}
+Format rules for this channel:
+{channel_rules}
+
 Asset tags: {asset_tags}
 Asset notes: {asset_notes}
+Today's date: {today}
 
-Write one caption only. No hashtag spam. Stay compliant. Keep under 2200 characters.
+Requirements:
+- Weave in 1-2 local SEO phrases (city/neighborhood or a listed local SEO keyword + a service) naturally; never keyword-stuff.
+- If a seasonal offer is in season for today's date, you may feature it.
+- Follow every compliance rule; never promise outcomes.
+- Hashtags only where the channel rules allow them; local hashtags come from the business's city/neighborhood.
+
+Output the final copy only.

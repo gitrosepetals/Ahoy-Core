@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Captain voice notes (runtime data; tests also write here)
+uploads/*/voice/

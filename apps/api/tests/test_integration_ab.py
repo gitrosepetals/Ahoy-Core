@@ -85,7 +85,7 @@ async def test_ab_crew_to_captain_pipeline_with_role_and_tenant_gates(
     released = release.json()[0]
     assert released["status"] == "pending_client"
     notify = (released.get("generation_meta") or {}).get("last_notify") or {}
-    assert notify.get("channel") in {"push_stub", "log", "sms_stub"}
+    assert notify.get("channel") in {"push", "sms", "log"}
 
     # --- A×B: Captain sees pending; request-edit; approve ---
     pending = await client.get(

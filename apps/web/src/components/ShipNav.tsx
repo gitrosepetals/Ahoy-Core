@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AhoyLogo } from "@/components/pirate/AhoyLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ShipClientSwitcher } from "@/components/ShipClientSwitcher";
 
 const LINKS = [
   {
@@ -61,6 +62,7 @@ export function ShipNav() {
             })}
           </ul>
         </nav>
+        <ShipClientSwitcher />
         <ThemeToggle className="shrink-0" />
       </div>
     </header>

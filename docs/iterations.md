@@ -2,9 +2,9 @@
 
 Living build log for **every product/engineering slice**, including work that is not a milestone checklist item (polish, merges, test hardening, CI). Newest first.
 
-**Current version:** `0.6.93`
+**Current version:** `1.2.0`
 
-Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing polish or API surface; reserve **major** for milestone-aligned releases (A/B/C/D). Milestone gates still have their own logs ([milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md)). Outages stay in [incident_log.md](./incident_log.md).
+Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing polish or API surface; reserve **major** for milestone-aligned releases (A/B/C/D). Milestone gates still have their own logs ([milestone_a.md](./milestone_a.md), [milestone_b.md](./milestone_b.md), [milestone_c.md](./milestone_c.md)). Outages stay in [incident_log.md](./incident_log.md); code defects in [bug_log.md](./bug_log.md).
 
 **Standing rule:** end every coding slice with a new version entry here (and bump **Current version**). If the slice also closes milestone checklist items, update that milestone file too — do not fold polish-only work into a closed milestone’s checklist as if it were new C/D scope.
 
@@ -24,8 +24,267 @@ Versioning: bump **patch** for docs/tests/CI-only; **minor** for user-facing pol
 
 **Tests:** (omit if untouched)
 
+**Bugs:** (omit if none) BUG-NNN found / fixed — see bug_log.md
+
 **Related:** optional links
 ```
+
+---
+
+## 1.2.0 — Deploy readiness: pluggable file storage + API Dockerfile
+
+**Why:** Uploads were written to the API host's local disk, which is wiped on every redeploy on Railway/Fly, so media and voice notes would vanish in production.
+
+**What shipped:**
+- **`services/storage.py`:** one `save_file()` for media photos and voice notes. `STORAGE_BACKEND=local` (default, unchanged dev behaviour) or `supabase` (Supabase Storage REST, public bucket). New env: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_BUCKET`.
+- **`apps/api/Dockerfile` + `.dockerignore`:** one image for the API and the worker (worker overrides the start command with `python -m app.worker`).
+- **[deployment.md](./deployment.md):** step-by-step Vercel + Railway + Supabase setup, env var table, webhooks, go-live checklist.
+
+**How to try:** local flow is unchanged. To test production storage, set the three Supabase vars and `STORAGE_BACKEND=supabase`, upload a photo in Crew, and confirm the URL points at `supabase.co/storage`.
+
+**Tests:** 3 new unit tests (`test_storage_1_2.py`: local write, Supabase request shape, config/error handling); ruff clean. Full suite 73 passed. Two publishing tests had been failing because 392 leftover approved posts in the local dev DB exceeded the publish batch limit; fixed in the tests (BUG-008). Docker image and live Supabase upload were **not** built or run.
+
+**Bugs:** BUG-008 found / fixed (test isolation) — see bug_log.md
+
+---
+
+## 1.1.0 — Faster Ship: API address fix + smooth Manifest trail
+
+**Why:** The Captain reported the app was slow and the Manifest's treasure-path trail lagged and disappeared off screen.
+
+**What shipped:**
+- **~200 ms saved per API call on Windows:** the web app and media URLs now use `http://127.0.0.1:8000` instead of `localhost:8000` (BUG-006).
+- **Trail rewritten for scroll performance:** no React re-renders while scrolling, `clipPath` reveal instead of a page-size mask, and the trail's tip stays at ~65% of the screen height while you scroll; the full trail shows at the bottom of the page (BUG-007). Scroll progress bar updated the same way.
+
+**How to try:** restart the API and `npm run dev` (env changes are read at start-up), hard-refresh `/ship/posts`, scroll fast up and down.
+
+**Tests:** 70 API tests passed; web `tsc` + lint clean. Trail behaviour checked by code review only — not yet verified visually in a browser.
+
+**Bugs:** BUG-006, BUG-007 fixed.
+
+---
+
+## 1.0.0 — Milestone D complete: Phase 1 Concierge MVP is pilot-ready
+
+**Why:** Closes [Milestone D](./milestone_d.md) — every Phase 1 gap from the 2026-11-01 PRD audit (0.7.0–0.15.0) is shipped, plus the tooling to run and measure the 5–10 client pilot. Major bump per the versioning rule.
+
+**What shipped:**
+- **Pilot KPIs (PRD §7):** `GET /kpis` (Crew) + "Pilot KPIs" panel on the Crew Deck — avg time-to-approve vs < 48h, share approved within 48h, Captains active (30 days) vs > 85%, logo churn vs < 4%, per client with billing status.
+- **[integrations_setup.md](./integrations_setup.md):** vendor-side walkthrough for Twilio, Firebase, OpenAI, Ayrshare, Google Business Profile, Facebook, Yelp, Stripe and Sentry — env vars, per-client Crew steps, how to verify — plus a per-client go-live checklist.
+- **Docs refresh:** technical plan (Milestone D done, full API surface, worker schedule, status machine with `expired`), README (docs index, worker, current phase, Captain/Ship/Crew vocabulary), API README, Milestone D Phase 1 coverage table + known follow-ups.
+
+**Phase 1 release train:** 0.7.0 correctness → 0.8.0 notifications → 0.9.0 worker + publishing → 0.10.0 ROI data → 0.11.0 reviews → 0.12.0 Ship (switcher, voice, PWA) → 0.13.0 Stripe → 0.14.0 terminology → 0.15.0 audit + Sentry → 1.0.0.
+
+**How to try:** Crew `+15551234002` → `/crew` → Pilot KPIs panel (approve a few posts as the Captain first).
+
+**Tests:** `tests/test_milestone_d_1_0.py` (time-to-approve, 48h share, Captain activity, Crew-only `/kpis`). 70 API tests passed; web `tsc`, lint and production build clean.
+
+**Bugs:** none new. Open bugs: none (BUG-001…005 fixed).
+
+**Known follow-ups:** email/SMS campaign sender; Blob/S3 media with signed URLs; native Capacitor push registration; frontend automated tests.
+
+---
+
+## 0.15.0 — Audit log, Sentry, structured logs
+
+**Why:** Pilot hardening — when a Captain asks "who approved that?" or a job fails at 3am, we need a record and an alert. [Milestone D](./milestone_d.md) D13.
+
+**What shipped:**
+- **Audit log (`services/audit.py`, table `audit_events`):** automatic capture of every post / review status change with actor (Captain, Crew, system job, webhook); credential saves (field names only); Stripe tier/status changes. Crew `GET /clients/{id}/audit` + "Ship's log" panel on the client berth.
+- **Sentry:** API (`sentry-sdk[fastapi]`), worker job failures, and web (`@sentry/browser`, lazy-loaded) — all off unless a DSN is set; no PII.
+- **Structured logs:** `LOG_FORMAT=json`, `LOG_LEVEL`; shared `app/observability.py` for API + worker.
+- **Single version source:** `app.__version__` (API title version + Sentry release).
+- Migration `011_audit_log.sql`; settings `LOG_FORMAT`, `LOG_LEVEL`, `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`; new deps `sentry-sdk[fastapi]` (API), `@sentry/browser` (web).
+
+**How to try:** apply `011_audit_log.sql`; generate → release → approve a post; Crew → client berth → "Ship's log" shows created → pending_client (crew) → approved (captain).
+
+**Tests:** `tests/test_milestone_d_0_15.py`: JSON formatter; full post trail with correct actor per step + Crew-only feed; credential audit never contains the secret. 69 API tests passed; web `tsc` + lint clean.
+
+**Bugs:** none.
+
+---
+
+## 0.14.0 — Terminology sweep: Captain, Ship, Crew
+
+**Why:** The Captain asked that the theme hold everywhere: **Captain** = business owner, **Ship** = the app, **Crew** = the A-hoy team. Copy added in 0.8–0.13 drifted to "owner", "your OK" and plain "notifications".
+
+**What shipped:**
+- **SMS / push:** sign-in "Ahoy, Captain! Tap to board your Ship"; posts ready "Ahoy, Captain! N new posts for <business> are on your Manifest awaiting your mark"; reminder "Captain, N posts … need your mark before <day> or they stay in port"; low-star "Storm on the Radar: 2★ review" / "Captain, <name> left …".
+- **Ship:** Radar statuses "Awaiting the Captain's mark", "· needs the Captain", "Captain replied on google"; Map "Turn on Ship alerts", "Your Ship's plan"; Logbook "Everything the Captain cleared for sail".
+- **Crew Deck:** "send it to the Captain", "Connect Google (Captain signs in)".
+- **Docs:** Milestone D wording ("owner" → "Captain"); vocabulary recorded as a design decision. API/code keep "client".
+
+**Tests:** new `tests/test_milestone_d_0_14.py` asserts every Captain notification says "Captain" and never "owner" / "your OK". `temp_client` fixture teardown fixed for tests that roll back. 66 API tests passed; web `tsc` + lint clean.
+
+**Bugs:** none (test-fixture teardown issue fixed in passing).
+
+---
+
+## 0.13.0 — Stripe billing: plans, customer portal, ad-spend pass-through
+
+**Why:** `subscription_tier` was a hand-set enum and nothing billed anyone; PRD §4 calls for Stripe Billing with recurring tier management and ad-spend pass-through. [Milestone D](./milestone_d.md) D11.
+
+**What shipped:**
+- **`services/billing.py`** (Stripe REST, idempotency keys): customer per client, Checkout session for a tier, customer-portal session, ad-spend invoice items, webhook signature check, event handler.
+- **API (`routers/billing.py`):** `GET /clients/{id}/billing`, `POST /clients/{id}/billing/checkout` `{tier}`, `POST /clients/{id}/billing/portal`, `POST /clients/{id}/billing/ad-spend` (Crew), `POST /webhooks/stripe`.
+- **Webhooks** keep `tier`, `subscription_status`, `current_period_end` and the Treasure Map's `billing_anchor_day` in sync; `invoice.payment_failed` → `past_due`; duplicates ignored via `stripe_events`.
+- **Ship:** "Your plan" card on the Treasure Map (tier, status, renewal) with **Manage billing** → Stripe portal.
+- **Crew:** Billing panel — status, choose tier → **Create checkout link** (copied to send to the Captain), **Bill ad spend**.
+- Migration `010_stripe_billing.sql`; settings `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_HARBOR|CRUISER|FLAGSHIP`.
+
+**How to try:** Stripe test mode: create 3 monthly prices, set the env vars, `stripe listen --forward-to localhost:8000/api/v1/webhooks/stripe`, Crew → Billing → Create checkout link → pay with 4242 4242 4242 4242 → tier/status update on both screens.
+
+**Tests:** `tests/test_milestone_d_0_13.py`: signature (valid, tampered, wrong secret, stale, missing), tier↔price mapping, checkout/portal/ad-spend requests via mock transport (customer reused, cents rounding, Crew-only ad spend, 400 when unconfigured), webhook → tier/status/anchor/period + duplicate + payment failed. 65 API tests passed; web `tsc` clean.
+
+**Bugs:** none.
+
+---
+
+## 0.12.0 — Ship: business switcher, voice-note edits, swipe to approve, installable PWA
+
+**Why:** Owners with two businesses were stuck on the first (BUG-004); Story 1.2's voice note, Story 1.1's swipe/instant next card and the PRD's PWA + push were missing. [Milestone D](./milestone_d.md) D12. (The planned 0.12.0 is split: Stripe moves to 0.13.0, audit log + Sentry to 0.14.0.)
+
+**What shipped:**
+- **Business switcher:** `lib/session.ts` `pickActiveClient` / `activeClientId`; `ShipClientSwitcher` in the Ship nav (only with 2+ businesses). Every Ship page (Map, Manifest, Logbook, Vault, Radar) uses the active business. Fixes BUG-004.
+- **Voice notes:** "🎙️ Voice note" next to Request edit (tap to record, tap to send, 30s cap) → `POST /queue/{id}/request-edit-voice` → Whisper transcript → AI rewrite (dev: stub transcript). Crew's Needs crew tab plays the note when the AI couldn't handle it.
+- **Faster approvals:** swipe a card right to approve; approve updates the card in place instead of reloading the Manifest.
+- **PWA:** `app/manifest.ts` (standalone, start `/ship`, icons incl. maskable + Apple touch icon generated from the brand mark), `public/sw.js` (FCM background push + notification click → deep link), `PwaRegister`; "Turn on notifications" on the Map requests permission, gets an FCM token (`firebase` SDK, lazy-loaded) and registers it — falls back to a dev stub when Firebase isn't configured.
+- New web env `NEXT_PUBLIC_FIREBASE_CONFIG`, `NEXT_PUBLIC_FIREBASE_VAPID_KEY`; new web dependency `firebase`; `uploads/*/voice/` git-ignored.
+
+**How to try:**
+1. `cd apps/web && npm install`.
+2. Captain → Manifest → on an awaiting post press 🎙️ Voice note, speak, press ■ Stop & send → caption is rewritten.
+3. On a phone (or devtools touch mode), swipe a card right → Approved.
+4. Chrome → install icon in the address bar on `/ship`.
+
+**Tests:** `tests/test_milestone_d_0_12.py`: voice note → dev transcript → rewrite → stored + served audio; unsupported type 415, >2 MB 413, Crew 403. Web: `npm run build` + `tsc --noEmit` clean. 61 API tests passed.
+
+**Bugs:** BUG-004 fixed.
+
+---
+
+## 0.11.0 — Reputation Radar for real: review sync + reply posting
+
+**Why:** Reviews were seed rows and "auto-replied" only meant a status flag — nothing was read from or posted to Google, Facebook or Yelp, and the PRD's optional 24-hour delay didn't exist. PRD CL-05; [Milestone D](./milestone_d.md) D10.
+
+**What shipped:**
+- **Providers (`services/review_providers.py`):** Google Business Profile (reviews, reply, locations, Performance API), Facebook Page ratings (+ comment reply), Yelp (read-only).
+- **Sync (`services/reviews.py`):** worker job `sync_all_reviews` every 30 min (+ Crew "Sync reviews now"); new reviews are drafted with the full Brand Brain; owner-answered reviews imported as `skipped`.
+- **Replies:** 4–5★ → `scheduled` until `reply_due_at` (client delay, default 24h) then posted by `post_due_review_replies` (5 min); 1–3★ → Captain. Captain can **edit**, **Approve & post** / **Send now**, or **Don't reply** (`POST /reviews/{id}/skip-reply`; approve accepts `reply_text`). Yelp shows **Copy reply**.
+- **Google OAuth:** `GET /clients/{id}/integrations/google/start` → Google consent → `/integrations/google/callback` stores the refresh token (encrypted) → Crew picks the location. Facebook: `PUT /clients/{id}/integrations/facebook`.
+- **GBP Performance:** `sync_gbp_performance` (6h) fills impressions / clicks / direction requests for the Detailed View.
+- **Ship Radar** shows source, stars, editable draft, and a plain-English status ("Auto-reply posts Tue 9:00 AM — skip or send now", "Reply posted …", "Yelp doesn't allow app replies — copy this").
+- **Crew:** connect Google, choose location, Facebook Page id + token, Yelp business id, auto-reply delay.
+- Migration `009_review_sync.sql`; settings `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `YELP_API_KEY`.
+
+**How to try:**
+1. Apply `009_review_sync.sql`.
+2. Locally (nothing connected) the seeded reviews still work: the 2★ shows an editable draft → Approve & post (dev-posts).
+3. Live Google: set the Google OAuth env vars, Crew → Connect Google → Choose location → Save → Sync reviews now.
+
+**Tests:** `tests/test_milestone_d_0_11.py`: Google/Facebook/Yelp parsers (mock transport), GBP performance parser, ingest (5★ scheduled +24h, 2★ alert once, owner-answered skipped, re-ingest idempotent), due-reply posting, Yelp → manual, live Google reply request, Captain edit/approve/skip + Crew sync, Google OAuth start/forged state/callback stores token, performance upsert. Shared `temp_client` fixture moved to `conftest.py`. 59 passed.
+
+**Bugs:** BUG-005 found and fixed before release (Yelp timestamps).
+
+---
+
+## 0.10.0 — Closed-loop ROI: call tracking, form leads, itemized breakdown
+
+**Why:** The Treasure Map's numbers were three seeded rows. PRD CL-01 / Story 2.1 need real tracked calls (over 60s) and form leads, and a breakdown "showing the exact call recordings/logs and form submissions that made up the number". [Milestone D](./milestone_d.md) D9.
+
+**What shipped:**
+- **Twilio call tracking (`routers/webhooks.py`):** `POST /webhooks/twilio/voice` (TwiML forward + optional recording with consent notice), `/voice/complete` (talk time, status, recording URL), `/recording` (late recording callback). Signature validation (`services/twilio_sig.py`).
+- **Form leads:** `POST /webhooks/forms/{key}` for client websites (HTML form or JSON), honeypot, thank-you redirect.
+- **Lead store + rollup (`services/leads.py`):** `lead_events` ORM (table existed since 001, unused until now); hourly worker job `rollup_daily_metrics` counts qualified calls (>= 60s), forms, directions and new reviews per client-local day.
+- **Itemized breakdown:** `GET /clients/{id}/roi/leads` + recording proxy; Ship revenue card now opens "How we got this number" listing every call (time, talk time, counted / not counted, caller, ▶ Play recording) and form (name, contact, message), then the daily rows.
+- **Detailed View (CL-01):** summary gains `detail` (impressions, clicks, CTR, direction requests, cost per lead); Ship toggle, hidden by default, remembered per device.
+- **Crew:** client settings add forward-to number, record calls, timezone and show the Twilio Voice webhook + website form URLs to wire; "Manual metrics" entry for ad spend / impressions / clicks / directions (`PUT /clients/{id}/roi/manual`).
+- ROI summary now uses the client's local "today" (timezone), matching the rollup.
+- Migration `008_lead_tracking.sql`; new dependency `tzdata` (Windows has no system tz database).
+
+**How to try:**
+1. Apply `008_lead_tracking.sql`; `uv sync`.
+2. Simulate a call: `curl -X POST localhost:8000/api/v1/webhooks/twilio/voice/complete -d CallSid=CA1 -d To=<tracking #> -d DialCallDuration=90` after setting a tracking number in Crew → Client settings, then `uv run python -m app.worker --once`.
+3. Simulate a form: `curl -X POST localhost:8000/api/v1/webhooks/forms/oaklawn-demo-form-key -d name=Pat -d email=pat@example.com`.
+4. Captain → `/ship` → tap the revenue card.
+
+**Tests:** `tests/test_milestone_d_0_10.py`: qualification threshold, signature round trip, voice → TwiML (forward, consent, record) → completion (idempotent retry) → rollup counts only the 75s call, unknown number, signature enforced when live, form endpoint (JSON, redirect, honeypot, validation, unknown key), itemized leads + Crew-only manual metrics + Detailed View CTR. 51 passed.
+
+**Bugs:** none new. (Timezone edge in two 0.7.0 tests fixed by using the client's local date.)
+
+---
+
+## 0.9.0 — Background worker + Ayrshare auto-publish
+
+**Why:** Approved posts never left the building — nothing published at `scheduled_publish_at`, and 0.8.0's reminders/expiry had nothing to run them. PRD CL-02 "auto-publishes approved items at scheduled times"; [Milestone D](./milestone_d.md) D7–D8.
+
+**What shipped:**
+- **Worker (`app/worker.py`):** asyncio loop, jobs `publish_due_posts` (60s), `send_expiry_reminders` (5m), `expire_overdue_posts` (5m). Advisory-locked per job; `--once` mode; optional `EMBEDDED_WORKER=true` runs it inside the API lifespan.
+- **Publishing (`services/publishing.py`):** Ayrshare `/api/post` with the client's profile key; Instagram (post/Reel), Facebook, TikTok, Google Business (`gmb`); media URL from the vault asset. Sets `published` + `published_external_id`. 3 attempts then `publish_failed`. Email/SMS flagged for manual send. Dev mode (no `AYRSHARE_API_KEY`) fakes success.
+- **Encrypted credentials (`services/credentials.py`):** Fernet-encrypted `integration_credentials` (first use of that table).
+- **Crew onboarding API:** `GET/PATCH /clients/{id}/settings` (tracking number, GBP location, POS provider, ticket value, conversion rate, billing day), `GET /clients/{id}/integrations`, `PUT /clients/{id}/integrations/ayrshare`, `POST /queue/{id}/publish-retry`, `POST /queue/{id}/mark-published`.
+- **Crew UI:** "Client settings & integrations" panel (incl. Ayrshare key, write-only); Approved tab shows Scheduled / Published / Retrying / Publish failed / Send manually with Retry and Mark sent.
+- **Ship Logbook (`/ship/calendar`):** no longer a stub — approved + published posts grouped by day with time, channel and "Sailed ✓".
+- New dependency `cryptography`; new settings `AYRSHARE_API_KEY`, `PUBLISH_MAX_ATTEMPTS`, `CREDENTIALS_ENCRYPTION_KEY`, `EMBEDDED_WORKER`.
+
+**How to try:**
+1. `cd apps/api && uv sync`.
+2. Generate (Days=1), release, approve as Captain; once its time passes run `uv run python -m app.worker --once` → the post shows "Sailed ✓" in the Ship Logbook. First local run also flushes any old approved test posts whose time has passed.
+3. Live: set `AYRSHARE_API_KEY`, paste the client's profile key in Crew → Client settings.
+
+**Tests:** `tests/test_milestone_d_0_9.py`: credential encryption + wrong key, Ayrshare body per channel, dev-mode publish (published / manual / TikTok fail → `publish_failed` after max attempts / future untouched), live request headers + body via mock transport, advisory lock skip, Crew settings + integrations (secret never echoed, Captain 403, validation), retry + mark-published. 45 passed.
+
+**Bugs:** none new.
+
+---
+
+## 0.8.0 — Real notifications, 48h queue link, expiry reminders, low-star alerts
+
+**Why:** Every Captain notification was a `NOTIFY_STUB` log line, so in a pilot nobody would ever hear that posts were ready, about to expire, or that a bad review landed. PRD CL-02 / Story 1.1 / CL-05; [Milestone D](./milestone_d.md) D5–D6.
+
+**What shipped:**
+- **Dispatcher (`services/notify.py`):** push via Firebase Cloud Messaging (new `services/push.py`, HTTP v1, works for iOS/Android/web tokens; invalid tokens auto-disabled) → SMS fallback via Twilio → dev log. Every attempt is stored in the new `notifications` table.
+- **Async SMS (`services/sms.py`):** Twilio REST over `httpx.AsyncClient`; used by both sign-in links and notifications. Fixes BUG-002.
+- **Story 1.1:** "posts ready" SMS includes a single-use magic link valid **48 hours** that signs the Captain in and opens `/ship/posts?tab=pending` directly.
+- **Queue expiry (CL-02):** new `expired` status at the post's publish time; Crew **Expired** tab with reschedule (`PUT /queue/{id}/caption` now takes `scheduled_publish_at`). Job `send_expiry_reminders` sends one "needs your OK before <day>" message per client 48h before posts expire; `expire_overdue_posts` flips overdue ones. (Scheduled by the job runner in 0.9.0.)
+- **Low-star alert (CL-05):** first time a 1–3★ review is drafted it alerts the Captain once, with the drafted reply preview and a link to `/ship/reviews`. Fixes BUG-003.
+- **Crew:** `GET /clients/{id}/notifications` + "Captain notifications" panel on the client berth (kind · channel · status · body · error).
+- Migration `007_notifications_queue_expiry.sql`; new settings `NOTIFY_LINK_TTL_HOURS`, `QUEUE_REMINDER_HOURS_BEFORE`, `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_FILE` (in `.env.example`).
+
+**How to try:**
+1. Apply `007_notifications_queue_expiry.sql`.
+2. Crew: generate + release. The berth's "Captain notifications" shows `queue_ready · log · logged` with the 48h link in the body — open it in a private window: you land on the Captain's pending posts already signed in.
+3. Live SMS: set `TWILIO_*` and `AUTH_DEV_MODE=false` (Twilio test credentials work).
+
+**Tests:** `tests/test_milestone_d_0_8.py`: async SMS request shape (mock transport), SMS gating, release → notification + 48h link that verifies into the queue, reminder once-per-client/once-per-post + window + quiet period, expiry → Crew reschedule (and Captain can't approve expired), BUG-003 alert once. Integration AB updated for the new channel names. 38 passed.
+
+**Bugs:** BUG-002 fixed, BUG-003 fixed.
+
+---
+
+## 0.7.0 — Phase 1 correctness: ROI, Brand Brain, multi-channel campaigns
+
+**Why:** The 2026-11-01 PRD audit found Phase 1 features that ran but did not match the spec: revenue could under-report, prompts ignored most of the Brand Brain, the generator covered 3 of 5 channels with no SEO/hashtags, and Crew had no way to see or fix AI-flagged revisions. Opens [Milestone D](./milestone_d.md) (D1–D4).
+
+**What shipped:**
+- **ROI (CL-01 / Story 2.1):** POS vs estimate decided per client from `pos_provider` (not per day); headline defaults to the **current billing period** (`clients.billing_anchor_day`), `?days=N` still works as a rolling window. Summary adds `period`, `period_start`, `period_end`, `qualified_call_min_seconds` (60). Treasure Map shows "Since <date> (this billing period)" and the correct formula text.
+- **Brand Brain (AG-01):** new `pricing_notes`, `seasonal_offers`, `local_seo_keywords` fields (migration `006`, Crew editor). New `BrandContext` puts the *whole* profile — business, voice, compliance, services, pricing, seasonal offers, ZIPs, SEO keywords — into every caption, revision **and** review-reply prompt. PUT only overwrites the new fields when sent.
+- **Campaign generator (AG-03):** Crew can pick any of Instagram post/Reel, Facebook, TikTok, Google Business update, Email newsletter; `fan_out` makes one formatted variation per channel per slot (shared `batch_id`, 60-post cap). Per-channel rules: local hashtags on IG/TikTok/FB, plain-text local-SEO GBP updates, Subject/Preview for email. Prompt no longer forbids hashtags.
+- **Asset tagging:** uploads are tagged by a vision model (live) or filename hints (dev) into PRD categories (staff, exterior, interior, product, testimonial, event) instead of `["uploaded"]`.
+- **Revision loop (Story 1.2):** Crew **Needs crew** tab lists edit requests the AI could not rewrite, shows the Captain's feedback, and allows a hand edit (`PUT /queue/{id}/caption`) that sends the post back to the Captain.
+- **CI:** API job now runs a pgvector Postgres service and applies every migration, so DB tests actually run in CI (previously all skipped). Compose mounts the whole migrations folder.
+- API version string bumped to 0.7.0 (was stale at 0.3.0).
+
+**How to try:**
+1. Apply `packages/db/migrations/006_brand_brain_billing_period.sql` (see `packages/db/README.md`).
+2. Crew `+15551234002` → client berth: fill Pricing / Seasonal offers / SEO keywords, save; tick all channels with "One version per channel" on, Generate — each slot gets IG, FB, TikTok, GBP and email variants.
+3. Captain `+15551234001` → `/ship`: revenue card reads "Since Nov 1 (this billing period)".
+
+**Tests:** `tests/test_milestone_d_0_7.py` (marker `milestone_d` + `unit`): billing-period math, BrandContext prompt, dev tags, BUG-001 regression, ROI default period, partial brand PUT, fan-out formatting, Crew caption edit. 32 passed.
+
+**Bugs:** BUG-001 fixed (mixed POS/estimate period). BUG-002..004 logged from the audit.
+
+**Related:** [milestone_d.md](./milestone_d.md), [bug_log.md](./bug_log.md)
 
 ---
 

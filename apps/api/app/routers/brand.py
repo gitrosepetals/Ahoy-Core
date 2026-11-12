@@ -16,6 +16,9 @@ def _to_out(profile: BrandProfile) -> BrandProfileOut:
         target_zip_codes=profile.target_zip_codes,
         compliance_rules=profile.compliance_rules,
         services_offered=profile.services_offered,
+        pricing_notes=profile.pricing_notes,
+        seasonal_offers=profile.seasonal_offers,
+        local_seo_keywords=profile.local_seo_keywords,
         has_embedding=profile.context_embedding is not None,
         updated_at=profile.updated_at,
     )
@@ -46,6 +49,10 @@ async def put_brand_profile(
     profile.target_zip_codes = body.target_zip_codes
     profile.compliance_rules = body.compliance_rules
     profile.services_offered = body.services_offered
+    # 0.7.0 fields: only overwrite when sent, so older clients don't null them out
+    for name in ("pricing_notes", "seasonal_offers", "local_seo_keywords"):
+        if name in body.model_fields_set:
+            setattr(profile, name, getattr(body, name))
     await recompute_embedding(settings, profile)
     await db.commit()
     await db.refresh(profile)

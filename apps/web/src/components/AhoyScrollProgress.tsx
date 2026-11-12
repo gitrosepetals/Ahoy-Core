@@ -166,9 +166,17 @@ function findAnchors(root: HTMLElement): { start: Pt; end: Pt } | null {
   return { start, end };
 }
 
+/** Where the trail's drawn tip sits, as a fraction of the viewport height. */
+const TIP_VIEWPORT_FRACTION = 0.65;
+
 /**
  * Atmosphere: optional grey slither + deck waves.
  * Trail is Manifest-only; waves used on Ship + Crew Brand Brain.
+ *
+ * Scrolling never re-renders React: the progress bar and the trail's reveal clip are
+ * updated straight on the DOM inside one rAF. The reveal is a clip rectangle that ends a
+ * fixed distance down the viewport, so the trail's tip always stays on screen (a page-size
+ * mask re-rasterized every frame was the source of the lag).
  */
 export function AhoyScrollProgress({
   trail: showTrail = false,
@@ -177,14 +185,13 @@ export function AhoyScrollProgress({
   trail?: boolean;
   waves?: boolean;
 } = {}) {
-  const maskId = useId().replace(/:/g, "");
-  const [pageP, setPageP] = useState(0);
+  const clipId = `ahoy-slither-${useId().replace(/:/g, "")}`;
   const [enabled, setEnabled] = useState(true);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [trail, setTrail] = useState("");
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const clipRectRef = useRef<SVGRectElement | null>(null);
   const layoutKeyRef = useRef("");
-  const sizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -194,70 +201,56 @@ export function AhoyScrollProgress({
     let layoutRaf = 0;
     let layoutTimer = 0;
 
-    const syncSvgBox = (w: number, h: number) => {
-      sizeRef.current = { w, h };
-      const svg = svgRef.current;
-      if (svg) {
-        svg.setAttribute("width", String(w));
-        svg.setAttribute("height", String(h));
-        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-      }
-    };
+    const getRoot = () =>
+      document.querySelector<HTMLElement>(".ahoy-trail-root") ?? document.documentElement;
 
-    const readPage = () => {
+    /** Pure DOM writes — safe to run every frame. */
+    const paint = () => {
       const doc = document.documentElement;
-      if (doc.scrollHeight <= doc.clientHeight) return 1;
-      const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
-      return Math.min(1, Math.max(0, (window.scrollY || doc.scrollTop) / max));
+      const scrollY = window.scrollY || doc.scrollTop;
+      const max = doc.scrollHeight - doc.clientHeight;
+      const progress = max <= 0 ? 1 : Math.min(1, Math.max(0, scrollY / max));
+      if (barRef.current) barRef.current.style.transform = `scaleX(${progress})`;
+
+      const rect = clipRectRef.current;
+      if (rect) {
+        const rootTop = getRoot().getBoundingClientRect().top + scrollY;
+        const atBottom = max > 0 && scrollY >= max - 2;
+        const reveal = atBottom
+          ? doc.scrollHeight
+          : scrollY + window.innerHeight * TIP_VIEWPORT_FRACTION - rootTop;
+        rect.setAttribute("height", String(Math.max(0, reveal)));
+      }
     };
 
     const onScroll = () => {
       if (scrollRaf) return;
       scrollRaf = requestAnimationFrame(() => {
         scrollRaf = 0;
-        const root =
-          document.querySelector<HTMLElement>(".ahoy-trail-root") ?? document.documentElement;
-        const w = root.offsetWidth || window.innerWidth;
-        const h = Math.max(root.offsetHeight, document.documentElement.scrollHeight);
-        // Grow the SVG with the page without rebuilding the path (avoids vanish mid-scroll)
-        if (h > sizeRef.current.h + 2 || Math.abs(w - sizeRef.current.w) > 2) {
-          syncSvgBox(w, Math.max(h, sizeRef.current.h));
-          setSize({ w, h: Math.max(h, sizeRef.current.h) });
-        }
-        setPageP(readPage());
+        paint();
       });
     };
 
     const rebuildPath = () => {
       layoutRaf = 0;
-      const root =
-        document.querySelector<HTMLElement>(".ahoy-trail-root") ?? document.documentElement;
+      const root = getRoot();
       const w = root.offsetWidth || window.innerWidth;
       const h = Math.max(root.offsetHeight, document.documentElement.scrollHeight);
-      syncSvgBox(w, h);
-      setSize({ w, h });
+      setSize((prev) => (Math.abs(prev.w - w) > 2 || Math.abs(prev.h - h) > 2 ? { w, h } : prev));
 
-      if (!showTrail) {
+      const next = showTrail ? findAnchors(root) : null;
+      if (!next) {
         layoutKeyRef.current = "";
         setTrail("");
-        setPageP(readPage());
-        return;
+      } else {
+        // Coarse key — ignore small height jitter; extend path when page grows a lot
+        const key = `${Math.round(w / 8)}:${Math.round(next.start.y / 16)}:${Math.round(next.end.y / 200)}`;
+        if (key !== layoutKeyRef.current) {
+          layoutKeyRef.current = key;
+          setTrail(buildSlither(next.start, next.end, w));
+        }
       }
-
-      const next = findAnchors(root);
-      if (!next) {
-        setTrail("");
-        setPageP(readPage());
-        return;
-      }
-
-      // Coarse key — ignore small height jitter; extend path when page grows a lot
-      const key = `${Math.round(w / 8)}:${Math.round(next.start.y / 16)}:${Math.round(next.end.y / 200)}`;
-      if (key !== layoutKeyRef.current) {
-        layoutKeyRef.current = key;
-        setTrail(buildSlither(next.start, next.end, w));
-      }
-      setPageP(readPage());
+      requestAnimationFrame(paint);
     };
 
     const onLayout = () => {
@@ -288,22 +281,12 @@ export function AhoyScrollProgress({
     };
   }, [showTrail]);
 
-  // pathLength=1 → reveal is just page progress (no getTotalLength flicker)
-  const drawn = Math.max(0.001, pageP);
-
   return (
     <>
-      {enabled ? (
-        <div
-          className="ahoy-scroll-progress"
-          style={{ transform: `scaleX(${pageP})` }}
-          aria-hidden
-        />
-      ) : null}
+      {enabled ? <div ref={barRef} className="ahoy-scroll-progress" aria-hidden /> : null}
 
-      {showTrail && size.w > 0 && size.h > 0 && trail ? (
+      {showTrail && enabled && size.w > 0 && size.h > 0 && trail ? (
         <svg
-          ref={svgRef}
           className="ahoy-dotted-line ahoy-dotted-line-page"
           width={size.w}
           height={size.h}
@@ -311,43 +294,23 @@ export function AhoyScrollProgress({
           aria-hidden
         >
           <defs>
-            <mask
-              id={`ahoy-slither-${maskId}`}
-              maskUnits="userSpaceOnUse"
-              x="0"
-              y="0"
-              width={size.w}
-              height={size.h}
-            >
-              <rect width={size.w} height={size.h} fill="black" />
-              <path
-                d={trail}
-                pathLength={1}
-                fill="none"
-                stroke="white"
-                strokeWidth="24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={`${drawn} 1`}
-              />
-            </mask>
+            <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+              <rect ref={clipRectRef} x="0" y="0" width={size.w} height="0" />
+            </clipPath>
           </defs>
-
-          {enabled ? (
-            <path
-              d={trail}
-              fill="none"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="5 20"
-              mask={`url(#ahoy-slither-${maskId})`}
-              style={{
-                stroke: "var(--ahoy-dotted-stroke)",
-                strokeOpacity: "var(--ahoy-dotted-opacity)",
-              }}
-            />
-          ) : null}
+          <path
+            d={trail}
+            fill="none"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="5 20"
+            clipPath={`url(#${clipId})`}
+            style={{
+              stroke: "var(--ahoy-dotted-stroke)",
+              strokeOpacity: "var(--ahoy-dotted-opacity)",
+            }}
+          />
         </svg>
       ) : null}
 

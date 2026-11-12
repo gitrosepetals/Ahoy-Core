@@ -72,6 +72,18 @@ class Client(Base):
     pos_provider: Mapped[str | None] = mapped_column(String(50))
     average_ticket_value: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("150.00"))
     conversion_rate_estimate: Mapped[Decimal] = mapped_column(Numeric(4, 2), default=Decimal("0.25"))
+    billing_anchor_day: Mapped[int] = mapped_column(SmallInteger, default=1, nullable=False)
+    forward_to_number: Mapped[str | None] = mapped_column(String(30))
+    record_calls: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    lead_form_key: Mapped[str | None] = mapped_column(String(64))
+    timezone: Mapped[str] = mapped_column(String(64), default="America/Chicago", nullable=False)
+    auto_reply_delay_hours: Mapped[int] = mapped_column(SmallInteger, default=24, nullable=False)
+    facebook_page_id: Mapped[str | None] = mapped_column(String(80))
+    yelp_business_id: Mapped[str | None] = mapped_column(String(120))
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64))
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(64))
+    subscription_status: Mapped[str] = mapped_column(String(32), default="none", nullable=False)
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped[User] = relationship(foreign_keys=[owner_user_id])
@@ -129,6 +141,32 @@ class DailyRoiMetric(Base):
     new_reviews_count: Mapped[int] = mapped_column(Integer, default=0)
     ad_spend_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     pos_attributed_revenue_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    clicks: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LeadEventType(str, enum.Enum):
+    tracked_call = "tracked_call"
+    form_lead = "form_lead"
+    gbp_direction = "gbp_direction"
+
+
+class LeadEvent(Base):
+    __tablename__ = "lead_events"
+
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[LeadEventType] = mapped_column(
+        Enum(LeadEventType, name="lead_event_type", create_type=False), nullable=False
+    )
+    external_id: Mapped[str | None] = mapped_column(String(200))
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    # "metadata" is reserved on declarative models
+    meta: Mapped[dict | None] = mapped_column("metadata", JSONB)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ReviewProvider(str, enum.Enum):
@@ -142,6 +180,7 @@ class ReplyStatus(str, enum.Enum):
     awaiting_captain = "awaiting_captain"
     captain_approved = "captain_approved"
     skipped = "skipped"
+    scheduled = "scheduled"
 
 
 class Review(Base):
@@ -163,6 +202,11 @@ class Review(Base):
     )
     generation_meta: Mapped[dict | None] = mapped_column(JSONB)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reply_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reply_posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reply_error: Mapped[str | None] = mapped_column(Text)
+    reply_target: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -179,6 +223,7 @@ class ApprovalStatus(str, enum.Enum):
     approved = "approved"
     changes_requested = "changes_requested"
     published = "published"
+    expired = "expired"
 
 
 class PlatformChannel(str, enum.Enum):
@@ -202,6 +247,9 @@ class BrandProfile(Base):
     target_zip_codes: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     compliance_rules: Mapped[str | None] = mapped_column(Text)
     services_offered: Mapped[dict | list | None] = mapped_column(JSONB)
+    pricing_notes: Mapped[str | None] = mapped_column(Text)
+    seasonal_offers: Mapped[dict | list | None] = mapped_column(JSONB)
+    local_seo_keywords: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     context_embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -253,6 +301,8 @@ class ContentQueue(Base):
     voice_feedback_url: Mapped[str | None] = mapped_column(Text)
     generation_meta: Mapped[dict | None] = mapped_column(JSONB)
     published_external_id: Mapped[str | None] = mapped_column(String(150))
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -263,4 +313,70 @@ class MarketingLead(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     business_name: Mapped[str | None] = mapped_column(String(200))
     source: Mapped[str] = mapped_column(String(80), nullable=False, default="welcome")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    notification_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    channel: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    deep_link: Mapped[str | None] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text)
+    payload: Mapped[dict | None] = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IntegrationCredential(Base):
+    __tablename__ = "integration_credentials"
+    __table_args__ = (UniqueConstraint("client_id", "provider", name="integration_credentials_client_id_provider_key"),)
+
+    credential_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    encrypted_payload: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StripeEvent(Base):
+    __tablename__ = "stripe_events"
+
+    event_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    audit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clients.client_id", ondelete="CASCADE")
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    actor_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(String(80))
+    action: Mapped[str] = mapped_column(String(60), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(40))
+    to_status: Mapped[str | None] = mapped_column(String(40))
+    details: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
